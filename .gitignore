@@ -1,0 +1,21 @@
+.DS_Store
+._*
+
+# Local secrets and runtime config
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and local artifacts
+**/node_modules/
+*.zip
+*.sql
+
+# Captured/user-generated assets
+xyzsniper/public/assets/images/avatars/
+xyzsniper/public/assets/images/screenshots/
+
+# Local logs and editor files
+*.log
+.idea/
+.vscode/
