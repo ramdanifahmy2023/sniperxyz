@@ -50,7 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const mcpUrlEl = document.getElementById('mcp-url');
             if (mcpUrlEl) {
                 const baseUrl = CONFIG.getBaseUrl();
-                mcpUrlEl.value = `${baseUrl}/mcp?token=${result.apiToken}`;
+                mcpUrlEl.value = `${baseUrl}/mcp`;
+                const mcpTokenEl = document.getElementById('mcp-token');
+                if (mcpTokenEl) mcpTokenEl.value = result.apiToken;
                 document.getElementById('mcp-info').style.display = 'block';
                 
                 // Copy Event
@@ -63,6 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('copy-mcp-btn').addEventListener('click', () => {
                     mcpUrlEl.click();
                 });
+                if (mcpTokenEl) {
+                  const copyToken = () => navigator.clipboard.writeText(mcpTokenEl.value);
+                  mcpTokenEl.addEventListener('click', copyToken);
+                  document.getElementById('copy-mcp-token-btn')?.addEventListener('click', copyToken);
+                }
             }
             
           } else {

@@ -17,6 +17,7 @@
       </header>
       <section style="padding: 24px; flex-grow: 1;">
         <form id="formUpdateEmail" action="<?= burl; ?>/ProcAccounts/updateEmail" method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>" />
           <div role="group" class="fieldset">
             <div role="group" class="field">
               <label for="currentEmail">Email Saat Ini</label>

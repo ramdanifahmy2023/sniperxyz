@@ -3,8 +3,12 @@
 class Mcp extends Controller {
   public function __construct() {
     header('Content-Type: application/json');
-    // Cors untuk development
-    header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? 'null'));
+    // Hanya izinkan origin aplikasi sendiri; jangan memantulkan origin arbitrer.
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin !== '' && $origin === rtrim(burl, '/')) {
+      header('Access-Control-Allow-Origin: ' . $origin);
+      header('Vary: Origin');
+    }
     header('Access-Control-Allow-Methods: POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization');
   }
@@ -123,7 +127,7 @@ class Mcp extends Controller {
       case 'tools/call':
         $toolName = $params['name'] ?? '';
         $args = $params['arguments'] ?? [];
-        $this->handleToolCall($id, $toolName, $args);
+        $this->handleToolCall($id, $toolName, $args, (int) $tokenData['account_id']);
         break;
 
       default:
@@ -132,7 +136,7 @@ class Mcp extends Controller {
     }
   }
 
-  private function handleToolCall($id, $toolName, $args) {
+  private function handleToolCall($id, $toolName, $args, $accountId) {
     // Inisialisasi Database
     $db = new Database();
 
@@ -140,7 +144,7 @@ class Mcp extends Controller {
       switch ($toolName) {
         case 'get_projects':
           $db->query('SELECT id, title, domain, is_active, created_at FROM projects WHERE account_id = :account_id ORDER BY created_at DESC');
-          $db->bind('account_id', $tokenData['account_id']);
+          $db->bind('account_id', $accountId);
           $projects = $db->getAll();
           
           $this->sendResult($id, [
@@ -165,7 +169,7 @@ class Mcp extends Controller {
             WHERE e.project_id = :project_id AND pr.account_id = :account_id
           ');
           $db->bind('project_id', $projectId);
-          $db->bind('account_id', $tokenData['account_id']);
+          $db->bind('account_id', $accountId);
           $endpoints = $db->getAll();
 
           $this->sendResult($id, [
@@ -184,7 +188,7 @@ class Mcp extends Controller {
 
           $db->query('SELECT p.id, p.http_method, p.query_params, p.response_header, p.response_body, p.request_body, p.status_code, p.referer, p.screenshot, p.created_at FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id JOIN projects pr ON pr.id=e.project_id WHERE p.endpoint_id = :endpoint_id AND pr.account_id = :account_id ORDER BY p.created_at DESC');
           $db->bind('endpoint_id', $endpointId);
-          $db->bind('account_id', $tokenData['account_id']);
+          $db->bind('account_id', $accountId);
           $payloads = $db->getAll();
 
           // Decode JSON fields untuk kejelasan
@@ -226,7 +230,7 @@ class Mcp extends Controller {
             LIMIT 50
           ');
           $db->bind('kw', $likeKeyword);
-          $db->bind('account_id', $tokenData['account_id']);
+          $db->bind('account_id', $accountId);
           $results = $db->getAll();
 
           $this->sendResult($id, [

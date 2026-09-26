@@ -20,6 +20,7 @@ class ProcProjects extends Controller {
       header('Location: ' . burl . '/panel');
       exit;
     }
+    ProcAuth::requireCsrf();
 
     $title = trim($_POST['title'] ?? '');
     $domain = trim($_POST['domain'] ?? '');
@@ -58,6 +59,7 @@ class ProcProjects extends Controller {
       header('Location: ' . burl . '/panel');
       exit;
     }
+    ProcAuth::requireCsrf();
 
     $projectModel = $this->m('ProjectModel');
     $accountId = $_SESSION['account']['id'];
@@ -77,6 +79,7 @@ class ProcProjects extends Controller {
       header('Location: ' . burl . '/panel');
       exit;
     }
+    ProcAuth::requireCsrf();
 
     $projectModel = $this->m('ProjectModel');
     $accountId = $_SESSION['account']['id'];
@@ -143,6 +146,7 @@ class ProcProjects extends Controller {
       http_response_code(405);
       exit;
     }
+    ProcAuth::requireCsrf();
     
     $accountId = $_SESSION['account']['id'];
     $projectModel = $this->m('ProjectModel');

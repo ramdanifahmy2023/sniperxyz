@@ -313,6 +313,7 @@ class ProcAuth extends Controller {
       header('Location: ' . burl . '/panel/account');
       exit;
     }
+    self::requireCsrf();
 
     // Pastikan pengguna sudah mengatur password manual sebelum memutuskan tautan
     $pwd = $_SESSION['account']['password'] ?? null;

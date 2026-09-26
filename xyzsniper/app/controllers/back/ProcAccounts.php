@@ -51,6 +51,30 @@ class ProcAccounts extends Controller {
     header('Location: ' . burl . '/panel/account');
     exit;
   }
+  public function updateEmail() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+      header('Location: ' . burl . '/panel/account'); exit;
+    }
+    ProcAuth::requireCsrf();
+    $email = strtolower(trim($_POST['new_email'] ?? ''));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      Flasher::setFlash('Gagal', 'Format email tidak valid.', 'error');
+      header('Location: ' . burl . '/panel/account'); exit;
+    }
+    $accountModel = $this->m('AccountModel');
+    $existing = $accountModel->getByEmail($email);
+    if ($existing && (int) $existing['id'] !== (int) $_SESSION['account']['id']) {
+      Flasher::setFlash('Gagal', 'Email sudah digunakan akun lain.', 'error');
+      header('Location: ' . burl . '/panel/account'); exit;
+    }
+    if ($accountModel->update($_SESSION['account']['id'], ['email' => $email])) {
+      $_SESSION['account']['email'] = $email;
+      Flasher::setFlash('Berhasil', 'Email berhasil diperbarui.', 'success');
+    } else {
+      Flasher::setFlash('Gagal', 'Email gagal diperbarui.', 'error');
+    }
+    header('Location: ' . burl . '/panel/account'); exit;
+  }
   public function getPasscode() {
     header('Content-Type: application/json');
     $code = Passcode::generate($_SESSION['account']['id']);

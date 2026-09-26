@@ -175,6 +175,7 @@
       </header>
       <section>
         <form id="formNewProject" action="<?= burl; ?>/ProcProjects/create" method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>" />
           <div role="group" class="fieldset">
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectTitle">Judul Proyek</label>

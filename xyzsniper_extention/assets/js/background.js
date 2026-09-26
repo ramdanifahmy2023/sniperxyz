@@ -8,11 +8,18 @@ console.log("Background script loaded.");
 let payloadQueue = [];
 let debounceTimer = null;
 let maxWaitTimer = null;
+let flushInProgress = false;
+let retryTimer = null;
 const DEBOUNCE_MS = 1500;
 const MAX_WAIT_MS = 5000;
 
+function persistQueue() {
+  chrome.storage.local.set({ pendingPayloadQueue: payloadQueue });
+}
+
 function flushQueue() {
-  if (payloadQueue.length === 0) return;
+  if (flushInProgress || payloadQueue.length === 0) return;
+  flushInProgress = true;
   
   // Salin dan kosongkan antrean
   const batch = [...payloadQueue];
@@ -24,40 +31,38 @@ function flushQueue() {
   
   chrome.storage.local.get(['apiToken'], (result) => {
     const token = result.apiToken;
-    if (!token) return;
+    if (!token) { payloadQueue = batch.concat(payloadQueue); persistQueue(); flushInProgress = false; return; }
     
-    chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 20 }, (dataUrl) => {
-      if (chrome.runtime.lastError) {
-         console.warn("XYZ Sniper: Could not capture tab:", chrome.runtime.lastError.message);
-         dataUrl = '';
-      }
-      
-      const captureApiUrl = CONFIG.getApiUrl('captureBulk');
-      
-      fetch(captureApiUrl, {
+    const captureApiUrl = CONFIG.getApiUrl('captureBulk');
+    fetch(captureApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({
-          screenshot: dataUrl,
           payloads: batch
         })
       })
-      .then(res => res.json())
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(resData => {
+         if (resData.status !== 'success') throw new Error(resData.message || 'capture gagal');
          console.log("🎯 XYZ Sniper: Bulk Payload successfully captured and sent.", resData);
+         flushInProgress = false;
       })
       .catch(err => {
          console.error("XYZ Sniper Bulk API Error:", err);
-      });
+         payloadQueue = batch.concat(payloadQueue);
+         persistQueue();
+         flushInProgress = false;
+         if (!retryTimer) retryTimer = setTimeout(() => { retryTimer = null; flushQueue(); }, 5000);
     });
   });
 }
 
 function enqueuePayload(payloadData) {
   payloadQueue.push(payloadData);
+  persistQueue();
   
   // Reset debounce timer
   if (debounceTimer) {
@@ -74,6 +79,10 @@ function enqueuePayload(payloadData) {
       }, MAX_WAIT_MS);
   }
 }
+
+chrome.storage.local.get(['pendingPayloadQueue'], (result) => {
+  if (Array.isArray(result.pendingPayloadQueue)) payloadQueue = result.pendingPayloadQueue;
+});
 
 async function generateHash(message) {
   const msgBuffer = new TextEncoder().encode(message);

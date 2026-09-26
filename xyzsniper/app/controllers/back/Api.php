@@ -1,6 +1,34 @@
 <?php
 
 class Api extends Controller {
+  private const MAX_REQUEST_BYTES = 12 * 1024 * 1024;
+  private const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
+  private function readJsonInput() {
+    $raw = file_get_contents('php://input');
+    if (strlen($raw) > self::MAX_REQUEST_BYTES) {
+      http_response_code(413);
+      echo json_encode(['status' => 'error', 'message' => 'Payload terlalu besar.']);
+      exit;
+    }
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+      http_response_code(400);
+      echo json_encode(['status' => 'error', 'message' => 'JSON tidak valid.']);
+      exit;
+    }
+    return $data;
+  }
+
+  private function enforceBodyLimit($value) {
+    $encoded = is_string($value) ? $value : json_encode($value);
+    if (is_string($encoded) && strlen($encoded) > self::MAX_BODY_BYTES) {
+      http_response_code(413);
+      echo json_encode(['status' => 'error', 'message' => 'Isi request atau response terlalu besar.']);
+      exit;
+    }
+    return $value;
+  }
   public function __construct() {
     // API Controller initialization
     header('Access-Control-Allow-Origin: *');
@@ -46,7 +74,7 @@ class Api extends Controller {
         exit;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = $this->readJsonInput();
     
     // 1. Cek Token dari Header atau Input
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
@@ -213,7 +241,7 @@ class Api extends Controller {
     $projectId = $activeProject['id'];
 
     // 3. Parsing Input dari Ekstensi
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = $this->readJsonInput();
     
     if (!$input || empty($input['url'])) {
         echo json_encode(['status' => 'error', 'message' => 'Data payload tidak lengkap.']);
@@ -289,7 +317,10 @@ class Api extends Controller {
     
     if (!empty($base64Image) && preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
         $data = substr($base64Image, strpos($base64Image, ',') + 1);
-        $data = base64_decode($data);
+        $data = base64_decode($data, true);
+        if ($data === false || strlen($data) > self::MAX_BODY_BYTES) {
+          http_response_code(413); echo json_encode(['status' => 'error', 'message' => 'Screenshot terlalu besar.']); exit;
+        }
         $extension = strtolower($type[1]);
         
         $filename = 'shot_' . time() . '_' . substr($payloadHash, 0, 8) . '.' . $extension;
@@ -307,11 +338,13 @@ class Api extends Controller {
     }
 
     // Persiapkan Data Payload
-    $queryParams = $input['queryParams'] ?? '';
-    $reqBodyRaw = $input['requestBody'] ?? null;
+        $queryParams = $input['queryParams'] ?? '';
+        $reqBodyRaw = $input['requestBody'] ?? null;
+        $this->enforceBodyLimit($reqBodyRaw);
     $requestBodyStr = is_array($reqBodyRaw) ? json_encode($reqBodyRaw) : $reqBodyRaw;
     
-    $resBodyRaw = $input['responseBody'] ?? null;
+        $resBodyRaw = $input['responseBody'] ?? null;
+        $this->enforceBodyLimit($resBodyRaw);
     $responseBodyStr = is_array($resBodyRaw) ? json_encode($resBodyRaw) : $resBodyRaw;
     $responseHeadersStr = is_array($responseHeaders) ? json_encode($responseHeaders) : null;
     $referer = $input['pageUrl'] ?? null;
@@ -389,7 +422,7 @@ class Api extends Controller {
     }
 
     // 3. Parsing Input (Array of Payloads)
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = $this->readJsonInput();
     if (!$input || empty($input['payloads']) || !is_array($input['payloads'])) {
         echo json_encode(['status' => 'error', 'message' => 'Data payload kosong atau format salah.']);
         exit;
@@ -478,9 +511,11 @@ class Api extends Controller {
         
         $queryParams = $pData['queryParams'] ?? '';
         $reqBodyRaw = $pData['requestBody'] ?? null;
+        $this->enforceBodyLimit($reqBodyRaw);
         $requestBodyStr = is_array($reqBodyRaw) ? json_encode($reqBodyRaw) : $reqBodyRaw;
         
         $resBodyRaw = $pData['responseBody'] ?? null;
+        $this->enforceBodyLimit($resBodyRaw);
         $responseBodyStr = is_array($resBodyRaw) ? json_encode($resBodyRaw) : $resBodyRaw;
         $responseHeadersStr = is_array($responseHeaders) ? json_encode($responseHeaders) : null;
         $referer = $pData['pageUrl'] ?? null;

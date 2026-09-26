@@ -1,12 +1,23 @@
--- Run after reviewing duplicate counts; each delete keeps the newest row.
+-- Run once after taking a database backup. Safe to rerun after checking index names.
 START TRANSACTION;
-DELETE e1 FROM endpoints e1 JOIN endpoints e2
-  ON e1.project_id=e2.project_id AND e1.path=e2.path AND e1.id<e2.id;
-DELETE p1 FROM payloads p1 JOIN payloads p2
-  ON p1.endpoint_id=p2.endpoint_id AND p1.payload_hash IS NOT NULL
- AND p1.payload_hash<>'' AND p1.payload_hash=p2.payload_hash AND p1.id<p2.id;
+CREATE TEMPORARY TABLE endpoint_merge AS
+SELECT e.id AS duplicate_id, MIN(c.id) AS canonical_id
+FROM endpoints e
+JOIN endpoints c ON c.project_id = e.project_id AND c.path = e.path
+GROUP BY e.id
+HAVING e.id <> MIN(c.id);
+UPDATE payloads p JOIN endpoint_merge m ON m.duplicate_id = p.endpoint_id
+SET p.endpoint_id = m.canonical_id;
+DELETE e FROM endpoints e JOIN endpoint_merge m ON m.duplicate_id = e.id;
+DROP TEMPORARY TABLE endpoint_merge;
+CREATE TEMPORARY TABLE payload_merge AS
+SELECT p.id AS duplicate_id FROM payloads p
+JOIN payloads keep ON keep.endpoint_id = p.endpoint_id
+  AND keep.payload_hash = p.payload_hash
+  AND keep.payload_hash IS NOT NULL AND keep.payload_hash <> ''
+  AND keep.id < p.id;
+DELETE p FROM payloads p JOIN payload_merge m ON m.duplicate_id = p.id;
+DROP TEMPORARY TABLE payload_merge;
 COMMIT;
 ALTER TABLE endpoints ADD UNIQUE KEY uq_endpoints_project_path (project_id, path(191));
 ALTER TABLE payloads ADD UNIQUE KEY uq_payloads_endpoint_hash (endpoint_id, payload_hash(191));
--- Normalize existing domains manually or with the application normalizer before
--- enforcing this check; new writes must store host[:port] only.

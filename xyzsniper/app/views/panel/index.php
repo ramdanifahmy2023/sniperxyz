@@ -201,6 +201,7 @@ if (!empty($data['projects'])) {
       </header>
       <section>
         <form id="formNewProject" action="<?= burl; ?>/ProcProjects/create" method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>" />
           <div role="group" class="fieldset">
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectTitle">Judul Proyek</label>
@@ -392,7 +393,8 @@ if (!empty($data['projects'])) {
 <script>
 function setActiveProject(id) {
   fetch('<?= burl; ?>/ProcProjects/set_active/' + id, {
-    method: 'POST'
+    method: 'POST',
+    headers: { 'X-CSRF-Token': '<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>' }
   })
   .then(response => response.json())
   .then(data => {
