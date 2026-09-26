@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../back/ProcAuth.php';
+
 class Auth extends Controller {
   public function index() {
     $data['judul'] = 'Login - ' . app_name;

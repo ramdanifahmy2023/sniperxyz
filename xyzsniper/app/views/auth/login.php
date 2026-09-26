@@ -37,7 +37,7 @@
       <div class="login-divider" aria-hidden="true">
         <span>atau</span>
       </div>
-      <a href="<?= burl; ?>/ProcAuth/google" class="btn" data-variant="outline">
+      <a href="<?= htmlspecialchars(burl, ENT_QUOTES, 'UTF-8'); ?>/ProcAuth/google" class="btn" data-variant="outline">
         <img
           class="login-google-icon"
           src="https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3c/Google_Favicon_2025.svg/960px-Google_Favicon_2025.svg.png"

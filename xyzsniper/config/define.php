@@ -9,11 +9,22 @@ if (!in_array($mode, ['local', 'host'], true)) {
 }
 
 $environment = strtoupper($mode);
-$appUrl = rtrim($env['APP_URL_' . $environment], '/');
+$canonicalAppUrl = rtrim($env['APP_URL_' . $environment], '/');
+$appUrl = $canonicalAppUrl;
+
+// Keep local browser sessions and assets on the local origin even when the
+// configured canonical URL is the public Cloudflare tunnel hostname.
+if ($mode === 'local') {
+  $requestHost = strtolower($_SERVER['HTTP_HOST'] ?? '');
+  if (in_array($requestHost, ['localhost:8000', '127.0.0.1:8000', 'localhost', '127.0.0.1'], true)) {
+    $appUrl = 'http://' . $requestHost;
+  }
+}
 
 // Core Application Info
 define('app_name', $env['APP_NAME']);
 define('APP_MODE', $mode);
+define('APP_CANONICAL_URL', $canonicalAppUrl);
 define('burl', $appUrl);
 define('assets', $appUrl . '/assets');
 define('images', $appUrl . '/assets/images');
