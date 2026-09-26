@@ -79,11 +79,14 @@ class Panel extends Controller {
   public function update_endpoint_label() {
     header('Content-Type: application/json');
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+      ProcAuth::requireCsrf();
       $id = $_POST['id'] ?? null;
       $label = $_POST['label'] ?? '';
       if ($id) {
-        $endpointModel = $this->m('EndpointModel');
-        $endpointModel->updateEndpoint($id, ['label' => $label]);
+        $db = new Database();
+        $db->query('UPDATE endpoints e JOIN projects p ON p.id=e.project_id SET e.label=:label WHERE e.id=:id AND p.account_id=:account_id');
+        $db->bind('label', substr($label, 0, 255)); $db->bind('id', (int)$id); $db->bind('account_id', (int)$_SESSION['account']['id']); $db->exe();
+        if ($db->row() < 1) { http_response_code(404); echo json_encode(['status'=>'error']); exit; }
         echo json_encode(['status' => 'success']);
         exit;
       }
@@ -109,7 +112,11 @@ class Panel extends Controller {
     $data['total'] = 0;
     if ($endpoint_id) {
         $endpointModel = $this->m('EndpointModel');
-        $data['endpoint'] = $endpointModel->getBy('id', $endpoint_id);
+        $db = new Database();
+        $db->query('SELECT e.* FROM endpoints e JOIN projects p ON p.id=e.project_id WHERE e.id=:id AND p.account_id=:account_id LIMIT 1');
+        $db->bind('id', (int)$endpoint_id); $db->bind('account_id', (int)$_SESSION['account']['id']);
+        $data['endpoint'] = $db->single();
+        if (!$data['endpoint']) { http_response_code(404); exit('Endpoint tidak ditemukan.'); }
         
         $payloadModel = $this->m('PayloadModel');
         $data['payloads'] = $payloadModel->getPaginatedByEndpointId($endpoint_id, $limit, $offset);

@@ -4,9 +4,9 @@ class Mcp extends Controller {
   public function __construct() {
     header('Content-Type: application/json');
     // Cors untuk development
-    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? 'null'));
     header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
   }
 
   public function index() {
@@ -22,10 +22,11 @@ class Mcp extends Controller {
     }
 
     // Validasi Token
-    $token = $_GET['token'] ?? null;
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $token = preg_match('/^Bearer\s+(\S+)$/i', trim($authHeader), $m) ? $m[1] : null;
     if (!$token) {
       http_response_code(401);
-      echo json_encode(['error' => 'Akses ditolak: Parameter ?token= wajib disertakan']);
+      echo json_encode(['error' => 'Akses ditolak: Authorization Bearer wajib disertakan']);
       exit;
     }
 
@@ -138,7 +139,8 @@ class Mcp extends Controller {
     try {
       switch ($toolName) {
         case 'get_projects':
-          $db->query('SELECT id, title, domain, is_active, created_at FROM projects ORDER BY created_at DESC');
+          $db->query('SELECT id, title, domain, is_active, created_at FROM projects WHERE account_id = :account_id ORDER BY created_at DESC');
+          $db->bind('account_id', $tokenData['account_id']);
           $projects = $db->getAll();
           
           $this->sendResult($id, [
@@ -159,9 +161,11 @@ class Mcp extends Controller {
             SELECT e.id, e.path, e.get, e.post, e.put, e.patch, e.delete, e.option, e.label, e.created_at,
                    (SELECT COUNT(p.id) FROM payloads p WHERE p.endpoint_id = e.id) as payload_count
             FROM endpoints e 
-            WHERE e.project_id = :project_id
+            JOIN projects pr ON pr.id=e.project_id
+            WHERE e.project_id = :project_id AND pr.account_id = :account_id
           ');
           $db->bind('project_id', $projectId);
+          $db->bind('account_id', $tokenData['account_id']);
           $endpoints = $db->getAll();
 
           $this->sendResult($id, [
@@ -178,8 +182,9 @@ class Mcp extends Controller {
           $endpointId = $args['endpoint_id'] ?? null;
           if (!$endpointId) $this->sendError(-32602, "Parameter endpoint_id dibutuhkan", $id);
 
-          $db->query('SELECT id, http_method, query_params, response_header, response_body, request_body, status_code, referer, screenshot, created_at FROM payloads WHERE endpoint_id = :endpoint_id ORDER BY created_at DESC');
+          $db->query('SELECT p.id, p.http_method, p.query_params, p.response_header, p.response_body, p.request_body, p.status_code, p.referer, p.screenshot, p.created_at FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id JOIN projects pr ON pr.id=e.project_id WHERE p.endpoint_id = :endpoint_id AND pr.account_id = :account_id ORDER BY p.created_at DESC');
           $db->bind('endpoint_id', $endpointId);
+          $db->bind('account_id', $tokenData['account_id']);
           $payloads = $db->getAll();
 
           // Decode JSON fields untuk kejelasan
@@ -213,13 +218,15 @@ class Mcp extends Controller {
             SELECT p.id, e.path, p.http_method, p.request_body, p.response_body, p.created_at 
             FROM payloads p
             JOIN endpoints e ON p.endpoint_id = e.id
-            WHERE p.request_body LIKE :kw 
+            JOIN projects pr ON pr.id=e.project_id
+            WHERE pr.account_id = :account_id AND (p.request_body LIKE :kw
                OR p.response_body LIKE :kw
                OR e.request_header LIKE :kw
-               OR e.path LIKE :kw
+               OR e.path LIKE :kw)
             LIMIT 50
           ');
           $db->bind('kw', $likeKeyword);
+          $db->bind('account_id', $tokenData['account_id']);
           $results = $db->getAll();
 
           $this->sendResult($id, [

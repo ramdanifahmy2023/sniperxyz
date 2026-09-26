@@ -13,7 +13,9 @@ class ExtensionTokenModel extends BaseModel {
 
   // Mengambil data token
   public function getByToken($token) {
-    return $this->getBy('token', $token);
+    $this->db->query('SELECT * FROM extension_tokens WHERE token = :token AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1');
+    $this->db->bind('token', $token);
+    return $this->db->single();
   }
 
   // Mengupdate waktu terakhir digunakan (last_used_at)

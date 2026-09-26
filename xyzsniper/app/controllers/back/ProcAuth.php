@@ -1,6 +1,16 @@
 <?php
 
 class ProcAuth extends Controller {
+  public static function csrfToken() {
+    if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf_token'];
+  }
+  public static function requireCsrf() {
+    $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!is_string($token) || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+      http_response_code(403); exit('CSRF token tidak valid.');
+    }
+  }
   public static function hasAuthenticatedSession() {
     return session_status() === PHP_SESSION_ACTIVE
       && ($_SESSION['is_authenticated'] ?? false) === true
@@ -18,6 +28,7 @@ class ProcAuth extends Controller {
       header('Location: ' . burl . '/auth');
       exit;
     }
+    self::requireCsrf();
 
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -38,13 +49,15 @@ class ProcAuth extends Controller {
       $this->fail('Alamat email belum terdaftar.');
     }
 
-    if ($account['password'] !== $password) {
+    $accountModel = $this->m('AccountModel');
+    if (!$accountModel->authenticate($email, $password)) {
       if (empty($account['password'])) {
         $this->fail('Akun ini belum memiliki kata sandi, silakan login menggunakan Google.');
       }
       $this->fail('Kata sandi yang Anda masukkan salah.');
     }
 
+    $account = $accountModel->getByEmail($email);
     session_regenerate_id(true);
     $_SESSION['account'] = $account;
     $_SESSION['is_authenticated'] = true;

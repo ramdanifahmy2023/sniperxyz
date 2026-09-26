@@ -11,7 +11,8 @@
     </header>
 
     <section>
-      <form action="<?= burl; ?>/ProcAuth/login" method="POST" class="login-form" id="loginForm">
+        <form action="<?= burl; ?>/ProcAuth/login" method="POST" class="login-form" id="loginForm">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>" />
         <div role="group" class="fieldset">
           <div role="group" class="field">
             <label for="email">Email</label>

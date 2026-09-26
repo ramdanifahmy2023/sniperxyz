@@ -315,6 +315,7 @@ if (!empty($data['projects'])) {
           const formData = new FormData();
           formData.append('id', endpointId);
           formData.append('label', newVal);
+          formData.append('csrf_token', '<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>');
           
           fetch('<?= burl ?>/panel/update_endpoint_label', {
             method: 'POST',

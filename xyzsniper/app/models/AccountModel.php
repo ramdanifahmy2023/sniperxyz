@@ -12,7 +12,15 @@ class AccountModel extends BaseModel {
       return false;
     }
 
-    return $account['password'] === $password ? $account : false;
+    if (empty($account['password'])) return false;
+    if (password_verify($password, $account['password'])) return $account;
+    if (hash_equals((string) $account['password'], (string) $password)) {
+      $hash = password_hash($password, PASSWORD_DEFAULT);
+      $this->update($account['id'], ['password' => $hash]);
+      $account['password'] = $hash;
+      return $account;
+    }
+    return false;
   }
 
   public function getByGoogleId($googleId) {

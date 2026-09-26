@@ -20,6 +20,7 @@ class ProcAccounts extends Controller {
       header('Location: ' . burl . '/panel/account');
       exit;
     }
+    ProcAuth::requireCsrf();
 
     $newPassword = $_POST['new_password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
@@ -36,7 +37,7 @@ class ProcAccounts extends Controller {
       exit;
     }
 
-    $plainPassword = $newPassword;
+    $plainPassword = password_hash($newPassword, PASSWORD_DEFAULT);
     $accountId = $_SESSION['account']['id'];
     
     $accountModel = $this->m('AccountModel');

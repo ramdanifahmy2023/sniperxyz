@@ -397,70 +397,31 @@ class Api extends Controller {
 
     $payloads = $input['payloads'];
     
-    // Identifikasi Proyek Berdasarkan Payload Pertama
-    $firstPayload = $payloads[0];
-    $referer = $firstPayload['pageUrl'] ?? '';
-    $reqUrl = $firstPayload['url'] ?? '';
-
-    // Pilih kecocokan host paling spesifik. Subdomain seperti
-    // seller.shopee.co.id juga cocok dengan shopee.co.id, tetapi harus
-    // dimiliki proyek seller.shopee.co.id.
-    $refererHost = $this->normalizeProjectHost($referer);
-    $requestHost = $this->normalizeProjectHost($reqUrl);
-    $matchedProject = null;
-    $matchedScore = -1;
-    foreach ($projects as $p) {
+    // Preflight every payload independently before any write. This prevents a mixed
+    // batch from being assigned to the first payload's project.
+    $payloadProjects = [];
+    foreach ($payloads as $idx => $candidate) {
+      $refererHost = $this->normalizeProjectHost($candidate['pageUrl'] ?? '');
+      $requestHost = $this->normalizeProjectHost($candidate['url'] ?? '');
+      $matchedProject = null; $matchedScore = -1; $tie = false;
+      foreach ($projects as $p) {
         $projectHost = $this->normalizeProjectHost($p['domain'] ?? '');
-        if ($projectHost === '') continue;
-
-        $refererScore = $this->projectHostScore($refererHost, $projectHost);
-        $requestScore = $this->projectHostScore($requestHost, $projectHost);
-        $score = max(
-            $refererScore >= 0 ? 1000000 + $refererScore : -1,
-            $requestScore
-        );
-
-        if ($score > $matchedScore) {
-            $matchedScore = $score;
-            $matchedProject = $p;
-        }
+        $score = max($this->projectHostScore($refererHost, $projectHost) >= 0 ? 1000000 + $this->projectHostScore($refererHost, $projectHost) : -1, $this->projectHostScore($requestHost, $projectHost));
+        if ($score > $matchedScore) { $matchedScore = $score; $matchedProject = $p; $tie = false; }
+        elseif ($score >= 0 && $score === $matchedScore) { $tie = true; }
+      }
+      if (!$matchedProject || $matchedScore < 0 || $tie) { http_response_code(422); echo json_encode(['status'=>'error','message'=>"Payload $idx domain tidak cocok atau ambigu."]); exit; }
+      $payloadProjects[$idx] = $matchedProject;
     }
-
-    if (!$matchedProject) {
-        echo json_encode(['status' => 'error', 'message' => 'Domain payload tidak cocok dengan proyek mana pun. Payload diabaikan.']);
-        exit;
-    }
-
-    $projectId = $matchedProject['id'];
+    $projectId = $payloadProjects[0]['id'];
     $endpointModel = $this->m('EndpointModel');
     $payloadModel = $this->m('PayloadModel');
-
-    // Handle Screenshot (Base64 to File) hanya SATU KALI untuk batch ini
-    $screenshotUrl = null;
-    $base64Image = $input['screenshot'] ?? '';
-    
-    if (!empty($base64Image) && preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
-        $data = substr($base64Image, strpos($base64Image, ',') + 1);
-        $data = base64_decode($data);
-        $extension = strtolower($type[1]);
-        
-        $filename = 'shot_bulk_' . time() . '_' . rand(1000, 9999) . '.' . $extension;
-        
-        $dir = __DIR__ . '/../../../public/assets/images/screenshots/' . $projectId . '/';
-        if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
-        }
-        
-        $filepath = $dir . $filename;
-        if (file_put_contents($filepath, $data)) {
-            $screenshotUrl = 'assets/images/screenshots/' . $projectId . '/' . $filename;
-        }
-    }
 
     // Proses setiap payload
     $processedCount = 0;
 
-    foreach ($payloads as $pData) {
+    foreach ($payloads as $idx => $pData) {
+        $projectId = $payloadProjects[$idx]['id'];
         $path = parse_url($pData['url'], PHP_URL_PATH) ?? '/';
         $requestHeaders = $pData['requestHeaders'] ?? [];
         $responseHeaders = $pData['responseHeaders'] ?? [];
@@ -511,6 +472,9 @@ class Api extends Controller {
         }
 
         $payloadHash = $pData['payloadHash'] ?? '';
+        // Bulk screenshots must be supplied per payload and are intentionally
+        // ignored here unless the originating tab metadata is available.
+        $screenshotUrl = null;
         
         $queryParams = $pData['queryParams'] ?? '';
         $reqBodyRaw = $pData['requestBody'] ?? null;

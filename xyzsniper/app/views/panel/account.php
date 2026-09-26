@@ -48,6 +48,7 @@
       </header>
       <section style="padding: 24px; flex-grow: 1;">
         <form id="formUpdatePassword" action="<?= burl; ?>/ProcAccounts/updatePassword" method="POST">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ProcAuth::csrfToken(), ENT_QUOTES); ?>" />
           <div role="group" class="fieldset">
             <div role="group" class="field">
               <label for="newPassword">Kata Sandi Baru</label>
