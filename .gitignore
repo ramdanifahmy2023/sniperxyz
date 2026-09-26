@@ -10,6 +10,7 @@
 **/node_modules/
 *.zip
 *.sql
+!xyzsniper/database/schema.sql
 
 # Captured/user-generated assets
 xyzsniper/public/assets/images/avatars/

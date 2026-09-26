@@ -93,15 +93,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const token = result.apiToken;
       
       if (!activeProject || !activeProject.domain || !token) {
+        console.warn('XYZ Sniper: capture diabaikan; token atau proyek aktif belum tersedia. Buka popup ekstensi untuk menyegarkan proyek.');
         return; // Tidak ada proyek aktif atau token
       }
 
       try {
         // Pastikan domain tangkapan cocok dengan target domain
-        const targetDomain = activeProject.domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
-        const currentDomain = new URL(pageUrl).hostname.replace(/^www\./, '');
+        // Compare host + port. `hostname` alone makes localhost:3000 fail.
+        const targetUrl = /^https?:\/\//i.test(activeProject.domain)
+          ? activeProject.domain
+          : 'http://' + activeProject.domain;
+        const target = new URL(targetUrl);
+        const current = new URL(pageUrl);
+        const targetHost = target.host.replace(/^www\./i, '').toLowerCase();
+        const currentHost = current.host.replace(/^www\./i, '').toLowerCase();
+        const domainMatches = currentHost === targetHost
+          || currentHost.endsWith('.' + targetHost);
 
-        if (currentDomain.includes(targetDomain) || targetDomain.includes(currentDomain)) {
+        if (domainMatches) {
           
           // Parsing untuk mendapatkan path dan query Params/payload
           let parsedUrl;
@@ -139,6 +148,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             
             enqueuePayload(payloadData);
           });
+        } else {
+          console.debug('XYZ Sniper: capture diabaikan; domain tidak cocok.', { currentHost, targetHost });
         }
       } catch (e) {
         console.error("XYZ Sniper: Error processing captured request", e);

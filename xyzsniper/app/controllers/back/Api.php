@@ -17,6 +17,27 @@ class Api extends Controller {
     exit;
   }
 
+  private function normalizeProjectHost($value) {
+    $value = trim((string) $value);
+    if ($value === '') return '';
+    if (!preg_match('#^https?://#i', $value)) {
+      $value = 'http://' . $value;
+    }
+    $parts = parse_url($value);
+    if (!$parts || empty($parts['host'])) return '';
+    $host = strtolower(rtrim($parts['host'], '.'));
+    return $host . (isset($parts['port']) ? ':' . $parts['port'] : '');
+  }
+
+  private function projectHostScore($payloadHost, $projectHost) {
+    if ($payloadHost === '' || $projectHost === '') return -1;
+    if ($payloadHost === $projectHost) return 100000 + strlen($projectHost);
+    if (str_ends_with($payloadHost, '.' . $projectHost)) {
+      return 1000 + strlen($projectHost);
+    }
+    return -1;
+  }
+
   public function auth() {
     header('Content-Type: application/json');
 
@@ -179,7 +200,7 @@ class Api extends Controller {
     $projects = $projectModel->getAllByAccountId($accountId);
     $activeProject = null;
     foreach ($projects as $p) {
-        if ($p['is_active'] === '1') {
+        if ((int) $p['is_active'] === 1) {
             $activeProject = $p;
             break;
         }
@@ -381,22 +402,27 @@ class Api extends Controller {
     $referer = $firstPayload['pageUrl'] ?? '';
     $reqUrl = $firstPayload['url'] ?? '';
 
+    // Pilih kecocokan host paling spesifik. Subdomain seperti
+    // seller.shopee.co.id juga cocok dengan shopee.co.id, tetapi harus
+    // dimiliki proyek seller.shopee.co.id.
+    $refererHost = $this->normalizeProjectHost($referer);
+    $requestHost = $this->normalizeProjectHost($reqUrl);
     $matchedProject = null;
+    $matchedScore = -1;
     foreach ($projects as $p) {
-        $domain = trim($p['domain']);
-        if (empty($domain)) continue;
-        
-        // Hapus protokol http/https dari domain proyek untuk pencocokan yang lebih baik
-        $cleanDomain = preg_replace('#^https?://#', '', $domain);
-        $cleanDomain = rtrim($cleanDomain, '/');
-        
-        if (!empty($referer) && strpos($referer, $cleanDomain) !== false) {
+        $projectHost = $this->normalizeProjectHost($p['domain'] ?? '');
+        if ($projectHost === '') continue;
+
+        $refererScore = $this->projectHostScore($refererHost, $projectHost);
+        $requestScore = $this->projectHostScore($requestHost, $projectHost);
+        $score = max(
+            $refererScore >= 0 ? 1000000 + $refererScore : -1,
+            $requestScore
+        );
+
+        if ($score > $matchedScore) {
+            $matchedScore = $score;
             $matchedProject = $p;
-            break;
-        }
-        if (!empty($reqUrl) && strpos($reqUrl, $cleanDomain) !== false) {
-            $matchedProject = $p;
-            break;
         }
     }
 

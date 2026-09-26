@@ -51,6 +51,12 @@ class ProjectModel extends BaseModel {
       $this->db->bind('id', $id);
       $this->db->bind('account_id', $accountId);
       $this->db->exe();
+      $activated = $this->db->row() > 0;
+
+      if (!$activated) {
+        $this->db->rollback();
+        return false;
+      }
       
       $this->db->commit();
       return true;

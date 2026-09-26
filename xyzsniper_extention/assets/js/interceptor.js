@@ -46,9 +46,15 @@
           }
         }
       } else if (args[0] instanceof Request) {
-        url = args[0].url;
-        method = args[0].method;
-        reqHeaders = Object.fromEntries(args[0].headers.entries());
+        const request = args[0];
+        url = request.url;
+        method = request.method;
+        reqHeaders = Object.fromEntries(request.headers.entries());
+        // Reading the original Request body would consume it. Clone first.
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+          reqBody = await request.clone().text();
+          reqBody = parseOrString(reqBody);
+        }
       }
     } catch (e) {
       console.warn("XYZ Sniper: Gagal parsing fetch request", e);
@@ -65,29 +71,22 @@
       try {
         const clone = response.clone();
         clone.text().then(text => {
-          let isJson = false;
           const resHeaders = Object.fromEntries(response.headers.entries());
-          const contentType = resHeaders['content-type'] || resHeaders['Content-Type'] || '';
-          
-          if (contentType.includes('application/json') || url.includes('.json')) {
-            isJson = true;
-          }
-
-          if (isJson) {
-            window.postMessage({
-              source: SENDER_ID,
-              payload: {
-                type: 'fetch',
-                method: method.toUpperCase(),
-                url: url,
-                requestHeaders: reqHeaders,
-                requestBody: parseOrString(reqBody),
-                responseHeaders: resHeaders,
-                responseBody: parseOrString(text),
-                status: response.status
-              }
-            }, '*');
-          }
+          // Do not require application/json: APIs often return text/plain,
+          // vendor media types, or no content-type while still carrying data.
+          window.postMessage({
+            source: SENDER_ID,
+            payload: {
+              type: 'fetch',
+              method: method.toUpperCase(),
+              url: url,
+              requestHeaders: reqHeaders,
+              requestBody: parseOrString(reqBody),
+              responseHeaders: resHeaders,
+              responseBody: parseOrString(text),
+              status: response.status
+            }
+          }, '*');
         }).catch(e => { /* Abaikan jika gagal baca text */ });
       } catch (cloneErr) {
         // Abaikan jika tidak bisa clone response (misal response tipe opaque)
@@ -120,37 +119,33 @@
     this._xyzReqBody = body;
     
     this.addEventListener('load', function() {
-      const contentType = this.getResponseHeader('Content-Type') || '';
-      let isJson = contentType.includes('application/json') || (this._xyzUrl && this._xyzUrl.includes('.json'));
-      
-      if (isJson) {
-        let resHeadersObj = {};
-        const resHeadersStr = this.getAllResponseHeaders();
-        if (resHeadersStr) {
-          resHeadersStr.trim().split(/[\r\n]+/).forEach(line => {
-            const parts = line.split(': ');
-            if(parts.length >= 2) {
-              const header = parts.shift();
-              const value = parts.join(': ');
-              resHeadersObj[header] = value;
-            }
-          });
-        }
-
-        window.postMessage({
-          source: SENDER_ID,
-          payload: {
-            type: 'xhr',
-            method: (this._xyzMethod || 'GET').toUpperCase(),
-            url: this._xyzUrl,
-            requestHeaders: this._xyzReqHeaders,
-            requestBody: parseOrString(this._xyzReqBody),
-            responseHeaders: resHeadersObj,
-            responseBody: parseOrString(this.responseText),
-            status: this.status
+      let resHeadersObj = {};
+      const resHeadersStr = this.getAllResponseHeaders();
+      if (resHeadersStr) {
+        resHeadersStr.trim().split(/[\r\n]+/).forEach(line => {
+          const parts = line.split(': ');
+          if(parts.length >= 2) {
+            const header = parts.shift();
+            const value = parts.join(': ');
+            resHeadersObj[header] = value;
           }
-        }, '*');
+        });
       }
+
+      // Capture vendor and text responses too; JSON is not guaranteed.
+      window.postMessage({
+        source: SENDER_ID,
+        payload: {
+          type: 'xhr',
+          method: (this._xyzMethod || 'GET').toUpperCase(),
+          url: this._xyzUrl,
+          requestHeaders: this._xyzReqHeaders,
+          requestBody: parseOrString(this._xyzReqBody),
+          responseHeaders: resHeadersObj,
+          responseBody: parseOrString(this.responseText),
+          status: this.status
+        }
+      }, '*');
     });
 
     return originalXhrSend.call(this, body);

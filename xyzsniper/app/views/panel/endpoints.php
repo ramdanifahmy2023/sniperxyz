@@ -3,7 +3,7 @@ $activeProjectTitle = 'Pilih Proyek';
 $activeProjectLogo = null;
 if (!empty($data['projects'])) {
   foreach ($data['projects'] as $p) {
-    if (isset($p['is_active']) && $p['is_active'] === '1') {
+    if (isset($p['is_active']) && (int) $p['is_active'] === 1) {
       $activeProjectTitle = htmlspecialchars($p['title']);
       $activeProjectLogo = !empty($p['logo']) ? htmlspecialchars($p['logo']) : null;
       $activeProjectId = $p['id'] ?? null;
@@ -515,7 +515,7 @@ if (!empty($data['projects'])) {
               </thead>
               <tbody>
                 <?php foreach ($data['projects'] as $index => $project): ?>
-                  <?php if (isset($project['is_active']) && $project['is_active'] === '1'): ?>
+                  <?php if (isset($project['is_active']) && (int) $project['is_active'] === 1): ?>
                     <tr class="active-project" style="cursor: default;">
                       <td class="text-center"><span class="material-symbols-outlined" style="font-size: 1.25rem;">check</span></td>
                       <td><?= htmlspecialchars($project['title']); ?></td>
