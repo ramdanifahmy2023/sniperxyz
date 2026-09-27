@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $data['judul'] ?? app_name; ?></title>
-  <link rel="icon" type="image/png" href="<?= assets; ?>/images/app_sources/logo.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="<?= assets; ?>/images/app_sources/favicon.png">
 
   <script>
     (() => {

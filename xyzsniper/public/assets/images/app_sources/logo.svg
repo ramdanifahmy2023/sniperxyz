@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Sniper</title>
+  <desc id="desc">A warm orange S mark on a dark rounded square.</desc>
+  <rect width="600" height="600" rx="148" fill="#211f1b"/>
+  <path d="M430 164H238c-48 0-87 39-87 87s39 87 87 87h124c48 0 87 39 87 87s-39 87-87 87H170" fill="none" stroke="#f08a45" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="430" cy="164" r="17" fill="#f1d4a4"/>
+</svg>
