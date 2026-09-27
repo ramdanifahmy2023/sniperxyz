@@ -73,6 +73,29 @@ document.addEventListener('DOMContentLoaded', () => {
                   mcpTokenEl.addEventListener('click', copyToken);
                   document.getElementById('copy-mcp-token-btn')?.addEventListener('click', copyToken);
                 }
+                const copyConfigBtn = document.getElementById('copy-mcp-config-btn');
+                const copyStatus = document.getElementById('mcp-copy-status');
+                if (copyConfigBtn && mcpTokenEl) {
+                  copyConfigBtn.addEventListener('click', async () => {
+                    const config = [
+                      '# XYZ Sniper MCP',
+                      `export SNIPER_MCP_URL="${mcpUrlEl.value}"`,
+                      `export SNIPER_MCP_TOKEN="${mcpTokenEl.value}"`
+                    ].join('\n');
+                    try {
+                      await navigator.clipboard.writeText(config);
+                      copyStatus.textContent = 'Akses MCP tersalin. Siap ditempel ke terminal atau agent.';
+                      copyStatus.style.color = '#059669';
+                      copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 0.35rem;">check</span>Tersalin';
+                      window.setTimeout(() => {
+                        copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 0.35rem;">content_copy</span>Salin akses MCP lengkap';
+                      }, 2200);
+                    } catch (error) {
+                      copyStatus.textContent = 'Clipboard tidak tersedia. Salin URL dan token secara manual.';
+                      copyStatus.style.color = '#dc2626';
+                    }
+                  });
+                }
             }
             
           } else {
