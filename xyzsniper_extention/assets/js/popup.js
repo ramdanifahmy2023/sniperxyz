@@ -44,7 +44,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('no-project').style.display = 'none';
             
             // Simpan proyek aktif ke storage agar bisa diakses oleh background.js
-            chrome.storage.local.set({ activeProject: project });
+            chrome.storage.local.set({ activeProject: project }, () => {
+              chrome.runtime.sendMessage({ type: 'XYZ_SNIPER_SYNC_PROJECT', project }).catch(() => {});
+            });
+            setupCaptureControls(result.apiToken);
             
             // Render MCP URL
             const mcpUrlEl = document.getElementById('mcp-url');
@@ -98,4 +101,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function redirectToPairing() {
   window.location.href = 'pair.html';
+}
+
+function setupCaptureControls(token) {
+  const status = document.getElementById('capture-status');
+  const toggle = document.getElementById('toggle-capture-btn');
+  const end = document.getElementById('end-capture-btn');
+  if (!status || !toggle || !end) return;
+  const queueStatus = document.getElementById('capture-queue-status');
+  chrome.runtime.sendMessage({ type: 'XYZ_SNIPER_QUEUE_STATUS' }).then(queue => {
+    if (queueStatus && queue) queueStatus.textContent = `Queue: ${queue.pending || 0} pending · ${queue.inflight || 0} dikirim · ${queue.deadLetter || 0} gagal permanen`;
+  }).catch(() => {});
+  chrome.storage.local.get(['captureEnabled'], stored => {
+    let enabled = stored.captureEnabled !== false;
+    const render = () => {
+      status.textContent = enabled ? 'Audit aktif' : 'Audit dijeda';
+      status.dataset.variant = enabled ? 'primary' : 'outline';
+      toggle.textContent = enabled ? 'Pause' : 'Lanjutkan';
+    };
+    render();
+    toggle.onclick = () => {
+      enabled = !enabled;
+      chrome.storage.local.set({ captureEnabled: enabled }, render);
+      chrome.runtime.sendMessage({ type: 'XYZ_SNIPER_SET_CAPTURE_STATE', enabled }).catch(() => {});
+    };
+    end.onclick = async () => {
+      const state = await new Promise(resolve => chrome.storage.local.get(['captureSession'], resolve));
+      const sessionId = state.captureSession && state.captureSession.session_id;
+      if (sessionId) {
+        try {
+          await fetch(CONFIG.getApiUrl('sessionEnd'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ session_id: sessionId })
+          });
+        } catch (_) {}
+      }
+      await new Promise(resolve => chrome.storage.local.set({ captureEnabled: false }, resolve));
+      await new Promise(resolve => chrome.storage.local.remove('captureSession', resolve));
+      enabled = false;
+      render();
+    };
+  });
 }

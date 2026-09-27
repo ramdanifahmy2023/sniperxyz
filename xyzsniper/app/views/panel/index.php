@@ -152,8 +152,8 @@ if (!empty($data['projects'])) {
         <span class="material-symbols-outlined" aria-hidden="true">data_object</span>
       </header>
       <section>
-        <strong><?= number_format($data['active_project']['payloads_count']); ?></strong>
-        <p>Payload yang terekam</p>
+        <strong><?= number_format($data['active_project']['payload_hits_count'] ?? $data['active_project']['payloads_count']); ?></strong>
+        <p>Total request terekam</p>
       </section>
     </article>
 

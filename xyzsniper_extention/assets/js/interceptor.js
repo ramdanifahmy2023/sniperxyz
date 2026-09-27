@@ -1,154 +1,236 @@
-(function() {
+(function () {
   const SENDER_ID = 'XYZ_SNIPER_INTERCEPT';
+  let sequenceNo = 0;
 
-  // Helper untuk mem-parsing body menjadi string atau JSON yang aman
-  function parseOrString(data) {
-    if (!data) return null;
-    try {
-      if (typeof data === 'string') return JSON.parse(data);
-      if (data instanceof Blob) return "Blob data";
-      if (data instanceof ArrayBuffer) return "ArrayBuffer data";
-      if (data instanceof FormData) {
-        let obj = {};
-        data.forEach((value, key) => { obj[key] = value; });
-        return obj;
-      }
-      if (data instanceof URLSearchParams) return data.toString();
-      if (typeof data === 'object') return JSON.parse(JSON.stringify(data)); // Pastikan clean object
-      return data;
-    } catch(e) {
-      return data.toString();
-    }
+  function makeId(prefix) {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return `${prefix}_${globalThis.crypto.randomUUID()}`;
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${sequenceNo}`;
   }
 
-  // --- OVERRIDE FETCH ---
+  function headersToObject(headers) {
+    if (!headers) return {};
+    try {
+      if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+      if (Array.isArray(headers)) return Object.fromEntries(headers);
+      return Object.assign({}, headers);
+    } catch (error) { return {}; }
+  }
+
+  function headerValue(headers, name) {
+    const wanted = String(name).toLowerCase();
+    const entry = Object.entries(headers || {}).find(([key]) => key.toLowerCase() === wanted);
+    return entry ? String(entry[1]) : '';
+  }
+
+  function isTextContentType(contentType) {
+    return /^(text\/|application\/(json|javascript|xml|graphql|x-www-form-urlencoded)|\+json\b|\+xml\b)/i.test(contentType || '');
+  }
+
+  function bytesToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    return btoa(binary);
+  }
+
+  function decodeBytes(buffer, contentType) {
+    if (isTextContentType(contentType)) {
+      const text = new TextDecoder().decode(buffer);
+      if (/json|graphql|javascript/i.test(contentType || '')) {
+        try { return { value: JSON.parse(text), raw: text, format: 'json' }; } catch (error) { /* Preserve malformed JSON as text. */ }
+      }
+      return { value: text, raw: text, format: 'text' };
+    }
+    return {
+      value: { encoding: 'base64', data: bytesToBase64(buffer), mime_type: contentType || 'application/octet-stream' },
+      raw: null,
+      format: 'binary'
+    };
+  }
+
+  async function serializeBody(body, contentType) {
+    if (body === null || body === undefined) return { value: null, raw: null, format: 'empty' };
+    if (typeof body === 'string') {
+      if (isTextContentType(contentType) && /json|graphql/i.test(contentType || '')) {
+        try { return { value: JSON.parse(body), raw: body, format: 'json' }; } catch (error) { /* Keep text. */ }
+      }
+      return { value: body, raw: body, format: 'text' };
+    }
+    if (body instanceof URLSearchParams) return { value: body.toString(), raw: body.toString(), format: 'text' };
+    if (body instanceof FormData) {
+      const values = {};
+      for (const [key, value] of body.entries()) {
+        if (value instanceof Blob) {
+          const item = decodeBytes(await value.arrayBuffer(), value.type || contentType || 'application/octet-stream');
+          values[key] = { name: value.name || null, type: value.type || null, size: value.size, body: item.value };
+        } else values[key] = String(value);
+      }
+      return { value: values, raw: null, format: 'form-data' };
+    }
+    if (body instanceof Blob) return decodeBytes(await body.arrayBuffer(), body.type || contentType);
+    if (body instanceof ArrayBuffer) return decodeBytes(body, contentType);
+    if (ArrayBuffer.isView(body)) return decodeBytes(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength), contentType);
+    if (typeof body === 'object') {
+      try { return { value: body, raw: JSON.stringify(body), format: 'json' }; } catch (error) { return { value: String(body), raw: String(body), format: 'text' }; }
+    }
+    return { value: body, raw: String(body), format: 'text' };
+  }
+
+  async function serializeRequest(request, contentType) {
+    if (!request || request.method === 'GET' || request.method === 'HEAD') return { value: null, raw: null, format: 'empty' };
+    try {
+      const buffer = await request.clone().arrayBuffer();
+      return buffer.byteLength ? decodeBytes(buffer, contentType) : { value: '', raw: '', format: 'text' };
+    } catch (error) { return { value: null, raw: null, format: 'unavailable' }; }
+  }
+
+  async function readResponse(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (response.status === 204 || response.status === 205 || !response.body) return { body: null, raw: null, contentType, format: 'empty', size: 0 };
+    try {
+      const buffer = await response.arrayBuffer();
+      const decoded = decodeBytes(buffer, contentType);
+      return { body: decoded.value, raw: decoded.raw, contentType, format: decoded.format, size: buffer.byteLength };
+    } catch (error) { return { body: null, raw: null, contentType, format: 'unavailable', size: 0 }; }
+  }
+
+  function getHost(url) {
+    try { return new URL(url, location.href).host; } catch (error) { return ''; }
+  }
+
+  function postCapture(payload) { window.postMessage({ source: SENDER_ID, payload }, '*'); }
+
+  function baseEvent(sourceType, url, method, startedAt) {
+    const absoluteUrl = (() => { try { return new URL(url, location.href).href; } catch (error) { return String(url || ''); } })();
+    return {
+      event_id: makeId('evt'), sequence_no: ++sequenceNo, source_type: sourceType,
+      request_url: absoluteUrl, host: getHost(absoluteUrl), method: String(method || 'GET').toUpperCase(),
+      url: absoluteUrl, started_at: Date.now(), started_perf: startedAt
+    };
+  }
+
+  async function captureFetch(event, requestHeaders, requestBody, response, durationMs) {
+    const responseHeaders = headersToObject(response.headers);
+    let responseData;
+    try {
+      responseData = await readResponse(response.clone());
+    } catch (error) {
+      responseData = { body: null, raw: null, contentType: headerValue(responseHeaders, 'content-type'), format: 'unavailable', size: 0 };
+    }
+    postCapture({
+      type: 'fetch', event_id: event.event_id, sequence_no: event.sequence_no, source_type: event.source_type,
+      request_url: event.request_url, host: event.host, method: event.method, url: event.url,
+      requestHeaders, requestBody: requestBody.value, requestBodyRaw: requestBody.raw, requestBodyFormat: requestBody.format,
+      responseHeaders, responseBody: responseData.body, responseBodyRaw: responseData.raw, responseBodyFormat: responseData.format,
+      content_type: responseData.contentType || headerValue(responseHeaders, 'content-type') || null,
+      request_content_type: headerValue(requestHeaders, 'content-type') || null,
+      request_size: requestBody.raw ? new TextEncoder().encode(requestBody.raw).length : null,
+      response_size: responseData.size, status: response.status, duration_ms: Math.max(0, Math.round(durationMs)),
+      response_url: response.url || event.request_url
+    });
+  }
+
   const originalFetch = window.fetch;
-  window.fetch = async function(...args) {
+  window.fetch = async function (...args) {
     let url = '';
     let method = 'GET';
-    let reqBody = null;
-    let reqHeaders = {};
-
+    let requestHeaders = {};
+    let requestBody = { value: null, raw: null, format: 'empty' };
     try {
-      if (typeof args[0] === 'string' || args[0] instanceof URL) {
-        url = args[0].toString();
-        if (args[1]) {
-          method = args[1].method || 'GET';
-          reqBody = args[1].body;
-          
-          // Tangani Headers object agar aman di-clone
-          if (args[1].headers) {
-            if (args[1].headers instanceof Headers) {
-              reqHeaders = Object.fromEntries(args[1].headers.entries());
-            } else {
-              reqHeaders = JSON.parse(JSON.stringify(args[1].headers));
-            }
-          }
-        }
-      } else if (args[0] instanceof Request) {
+      if (args[0] instanceof Request) {
         const request = args[0];
-        url = request.url;
-        method = request.method;
-        reqHeaders = Object.fromEntries(request.headers.entries());
-        // Reading the original Request body would consume it. Clone first.
-        if (request.method !== 'GET' && request.method !== 'HEAD') {
-          reqBody = await request.clone().text();
-          reqBody = parseOrString(reqBody);
-        }
+        url = request.url; method = request.method; requestHeaders = headersToObject(request.headers);
+        requestBody = await serializeRequest(request, headerValue(requestHeaders, 'content-type'));
+      } else {
+        url = String(args[0] || '');
+        const init = args[1] || {};
+        method = init.method || 'GET'; requestHeaders = headersToObject(init.headers);
+        requestBody = await serializeBody(init.body, headerValue(requestHeaders, 'content-type'));
       }
-    } catch (e) {
-      console.warn("XYZ Sniper: Gagal parsing fetch request", e);
-    }
+    } catch (error) { console.warn('XYZ Sniper: fetch request metadata unavailable', error); }
 
-    // Abaikan intersepsi untuk file statis (mencegah warning preload/credentials di browser)
-    if (url && url.match(/\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ico|webp|avif)(\?.*)?$/i)) {
-      return originalFetch.apply(this, args);
-    }
-
+    if (url && /\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ico|webp|avif)(\?.*)?$/i.test(url)) return originalFetch.apply(this, args);
+    const startedAt = performance.now();
+    const event = baseEvent('fetch', url, method, startedAt);
     try {
       const response = await originalFetch.apply(this, args);
-      
-      try {
-        const clone = response.clone();
-        clone.text().then(text => {
-          const resHeaders = Object.fromEntries(response.headers.entries());
-          // Do not require application/json: APIs often return text/plain,
-          // vendor media types, or no content-type while still carrying data.
-          window.postMessage({
-            source: SENDER_ID,
-            payload: {
-              type: 'fetch',
-              method: method.toUpperCase(),
-              url: url,
-              requestHeaders: reqHeaders,
-              requestBody: parseOrString(reqBody),
-              responseHeaders: resHeaders,
-              responseBody: parseOrString(text),
-              status: response.status
-            }
-          }, '*');
-        }).catch(e => { /* Abaikan jika gagal baca text */ });
-      } catch (cloneErr) {
-        // Abaikan jika tidak bisa clone response (misal response tipe opaque)
-      }
-      
+      captureFetch(event, requestHeaders, requestBody, response, performance.now() - startedAt)
+        .catch(error => console.debug('XYZ Sniper: fetch response metadata unavailable', error));
       return response;
-    } catch(error) {
+    } catch (error) {
+      postCapture({
+        type: 'fetch', event_id: event.event_id, sequence_no: event.sequence_no, source_type: event.source_type,
+        request_url: event.request_url, host: event.host, method: event.method, url: event.url, requestHeaders,
+        requestBody: requestBody.value, requestBodyRaw: requestBody.raw, requestBodyFormat: requestBody.format,
+        responseHeaders: {}, responseBody: null, responseBodyRaw: null, responseBodyFormat: 'network-error',
+        content_type: null, request_content_type: headerValue(requestHeaders, 'content-type') || null,
+        status: 0, duration_ms: Math.max(0, Math.round(performance.now() - startedAt)), error: String(error && error.message || error)
+      });
       throw error;
     }
   };
 
-  // --- OVERRIDE XHR ---
   const originalXhrOpen = XMLHttpRequest.prototype.open;
   const originalXhrSend = XMLHttpRequest.prototype.send;
   const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
-  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this._xyzMethod = method;
-    this._xyzUrl = url;
-    this._xyzReqHeaders = {};
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    this._xyzMethod = method; this._xyzUrl = String(url || ''); this._xyzReqHeaders = {}; this._xyzStartedAt = 0; this._xyzEvent = null;
     return originalXhrOpen.call(this, method, url, ...rest);
   };
 
-  XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
-    this._xyzReqHeaders[header] = value;
+  XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
+    this._xyzReqHeaders = this._xyzReqHeaders || {};
+    this._xyzReqHeaders[header] = this._xyzReqHeaders[header] ? `${this._xyzReqHeaders[header]}, ${value}` : value;
     return originalXhrSetRequestHeader.call(this, header, value);
   };
 
-  XMLHttpRequest.prototype.send = function(body) {
-    this._xyzReqBody = body;
-    
-    this.addEventListener('load', function() {
-      let resHeadersObj = {};
-      const resHeadersStr = this.getAllResponseHeaders();
-      if (resHeadersStr) {
-        resHeadersStr.trim().split(/[\r\n]+/).forEach(line => {
-          const parts = line.split(': ');
-          if(parts.length >= 2) {
-            const header = parts.shift();
-            const value = parts.join(': ');
-            resHeadersObj[header] = value;
-          }
-        });
-      }
-
-      // Capture vendor and text responses too; JSON is not guaranteed.
-      window.postMessage({
-        source: SENDER_ID,
-        payload: {
-          type: 'xhr',
-          method: (this._xyzMethod || 'GET').toUpperCase(),
-          url: this._xyzUrl,
-          requestHeaders: this._xyzReqHeaders,
-          requestBody: parseOrString(this._xyzReqBody),
-          responseHeaders: resHeadersObj,
-          responseBody: parseOrString(this.responseText),
-          status: this.status
+  XMLHttpRequest.prototype.send = function (body) {
+    this._xyzReqBody = body; this._xyzStartedAt = performance.now(); this._xyzEvent = baseEvent('xhr', this._xyzUrl, this._xyzMethod, this._xyzStartedAt);
+    const xhr = this;
+    this.addEventListener('loadend', async function () {
+      const responseHeaders = {};
+      (xhr.getAllResponseHeaders() || '').trim().split(/[\r\n]+/).forEach(line => {
+        const separator = line.indexOf(':');
+        if (separator > 0) {
+          const name = line.slice(0, separator).trim();
+          const value = line.slice(separator + 1).trim();
+          responseHeaders[name] = responseHeaders[name] ? `${responseHeaders[name]}, ${value}` : value;
         }
-      }, '*');
-    });
-
+      });
+      const contentType = headerValue(responseHeaders, 'content-type');
+      let responseData = { body: null, raw: null, format: 'empty', size: 0, contentType };
+      try {
+        if (xhr.status !== 204 && xhr.status !== 205) {
+          if (xhr.responseType === 'blob' && xhr.response instanceof Blob) {
+            const decoded = decodeBytes(await xhr.response.arrayBuffer(), xhr.response.type || contentType);
+            responseData = { body: decoded.value, raw: decoded.raw, format: decoded.format, size: xhr.response.size, contentType: xhr.response.type || contentType };
+          } else if (xhr.responseType === 'arraybuffer' && xhr.response instanceof ArrayBuffer) {
+            const decoded = decodeBytes(xhr.response, contentType);
+            responseData = { body: decoded.value, raw: decoded.raw, format: decoded.format, size: xhr.response.byteLength, contentType };
+          } else if (xhr.responseType === 'json' && xhr.response !== null) {
+            const raw = JSON.stringify(xhr.response);
+            responseData = { body: xhr.response, raw, format: 'json', size: raw.length, contentType };
+          } else if (typeof xhr.responseText === 'string') {
+            const raw = xhr.responseText; let bodyValue = raw;
+            if (/json|graphql/i.test(contentType)) { try { bodyValue = JSON.parse(raw); } catch (error) { /* Keep malformed JSON as text. */ } }
+            responseData = { body: bodyValue, raw, format: bodyValue === raw ? 'text' : 'json', size: new TextEncoder().encode(raw).length, contentType };
+          }
+        }
+      } catch (error) { responseData = { body: null, raw: null, format: 'unavailable', size: 0, contentType }; }
+      const requestData = await serializeBody(xhr._xyzReqBody, headerValue(xhr._xyzReqHeaders, 'content-type'));
+      const event = xhr._xyzEvent;
+      postCapture({
+        type: 'xhr', event_id: event.event_id, sequence_no: event.sequence_no, source_type: event.source_type,
+        request_url: event.request_url, host: event.host, method: event.method, url: event.url,
+        requestHeaders: xhr._xyzReqHeaders || {}, requestBody: requestData.value, requestBodyRaw: requestData.raw, requestBodyFormat: requestData.format,
+        responseHeaders, responseBody: responseData.body, responseBodyRaw: responseData.raw, responseBodyFormat: responseData.format,
+        content_type: responseData.contentType || contentType || null, request_content_type: headerValue(xhr._xyzReqHeaders, 'content-type') || null,
+        request_size: requestData.raw ? new TextEncoder().encode(requestData.raw).length : null, response_size: responseData.size,
+        status: xhr.status || 0, duration_ms: Math.max(0, Math.round(performance.now() - event.started_perf)), response_url: xhr.responseURL || event.request_url
+      });
+    }, { once: true });
     return originalXhrSend.call(this, body);
   };
-
 })();

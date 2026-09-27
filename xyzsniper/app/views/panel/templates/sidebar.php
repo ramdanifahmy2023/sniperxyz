@@ -35,6 +35,12 @@ $curr_meth = strtolower($url_parts[1] ?? 'index');
             </a>
           </li>
           <li>
+            <a href="<?= burl; ?>/panel/sessions" <?= ($curr_ctrl == 'panel' && in_array($curr_meth, ['sessions', 'session'])) ? 'aria-current="page"' : '' ?>>
+              <span class="material-symbols-outlined" aria-hidden="true">timeline</span>
+              <span>Sesi Audit</span>
+            </a>
+          </li>
+          <li>
             <a href="<?= burl; ?>/panel/extension" <?= ($curr_ctrl == 'panel' && $curr_meth == 'extension') ? 'aria-current="page"' : '' ?>>
               <span class="material-symbols-outlined" aria-hidden="true">extension</span>
               <span>Ekstensi Chrome</span>

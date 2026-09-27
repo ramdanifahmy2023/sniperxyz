@@ -1,12 +1,12 @@
 // assets/js/config.js
 
 const CONFIG = {
-  // Ubah ke 'host' jika ekstensi ingin diarahkan ke server online
+  // Gunakan 'host' untuk merekam melalui tunnel publik.
   MODE: 'local',
 
   URLS: {
     local: 'http://localhost:8000',
-    host: 'https://domain-anda.com' // Ganti dengan domain asli jika sudah online
+    host: 'https://sniper.fahra.my.id'
   },
 
   // Mendapatkan Base URL sesuai mode yang aktif

@@ -70,7 +70,8 @@ class ProjectModel extends BaseModel {
     $this->db->query('
       SELECT p.*, 
              (SELECT COUNT(*) FROM endpoints WHERE project_id = p.id) as endpoints_count,
-             (SELECT COUNT(*) FROM payloads WHERE endpoint_id IN (SELECT id FROM endpoints WHERE project_id = p.id)) as payloads_count
+             (SELECT COUNT(*) FROM payloads WHERE endpoint_id IN (SELECT id FROM endpoints WHERE project_id = p.id)) as payloads_count,
+             (SELECT COALESCE(SUM(hit_count), 0) FROM payloads WHERE endpoint_id IN (SELECT id FROM endpoints WHERE project_id = p.id)) as payload_hits_count
       FROM projects p
       WHERE p.account_id = :account_id AND p.is_active = "1"
       LIMIT 1
@@ -81,11 +82,11 @@ class ProjectModel extends BaseModel {
 
   public function getProjectChartData($projectId) {
     $this->db->query('
-      SELECT DATE(created_at) as date, COUNT(*) as count 
+      SELECT DATE(COALESCE(last_seen, created_at)) as date, COALESCE(SUM(hit_count), COUNT(*)) as count
       FROM payloads 
       WHERE endpoint_id IN (SELECT id FROM endpoints WHERE project_id = :project_id)
-        AND created_at >= DATE_SUB(CURDATE(), INTERVAL 27 DAY)
-      GROUP BY DATE(created_at)
+        AND COALESCE(last_seen, created_at) >= DATE_SUB(CURDATE(), INTERVAL 27 DAY)
+      GROUP BY DATE(COALESCE(last_seen, created_at))
       ORDER BY date ASC
     ');
     $this->db->bind('project_id', $projectId);

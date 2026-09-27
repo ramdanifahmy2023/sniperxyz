@@ -69,6 +69,13 @@
             style="margin: 0; font-size: 0.875rem; color: #3b82f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             -</p>
 
+          <div id="capture-controls" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span id="capture-status" class="badge" data-variant="primary">Audit aktif</span>
+            <button id="toggle-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Pause</button>
+            <button id="end-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Akhiri sesi</button>
+            <small id="capture-queue-status" style="width:100%;color:#64748b;">Queue: memuat...</small>
+          </div>
+
           <div id="mcp-info" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; display: none;">
             <h3 style="margin: 0 0 0.5rem 0; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
               MCP Server URL</h3>

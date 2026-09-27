@@ -309,6 +309,7 @@ class Api extends Controller {
     // --- PAYLOAD SAVING LOGIC ---
     $payloadModel = $this->m('PayloadModel');
     $payloadHash = $input['payloadHash'] ?? '';
+    $eventId = trim((string) ($input['eventId'] ?? $input['event_id'] ?? '')) ?: bin2hex(random_bytes(16));
 
 
     // Handle Screenshot (Base64 to File)
@@ -350,8 +351,26 @@ class Api extends Controller {
     $referer = $input['pageUrl'] ?? null;
 
     $payloadData = [
-        'endpoint_id' => $endpointId,
-        'request_body' => $requestBodyStr,
+      'endpoint_id' => $endpointId,
+        'event_id' => $eventId,
+        'session_id' => $input['sessionId'] ?? $input['session_id'] ?? null,
+        'sequence_no' => $input['sequenceNo'] ?? $input['sequence_no'] ?? null,
+        'tab_id' => $input['tabId'] ?? $input['tab_id'] ?? null,
+        'frame_id' => $input['frameId'] ?? $input['frame_id'] ?? null,
+        'navigation_id' => $input['navigationId'] ?? $input['navigation_id'] ?? null,
+        'source_type' => $input['sourceType'] ?? $input['source_type'] ?? null,
+        'request_url' => $input['url'],
+        'host' => $this->normalizeProjectHost($input['url']),
+        'content_type' => $input['contentType'] ?? null,
+        'request_size' => $requestBodyStr === null ? 0 : strlen((string) $requestBodyStr),
+        'response_size' => $responseBodyStr === null ? 0 : strlen((string) $responseBodyStr),
+        'truncated' => !empty($input['truncated']) ? 1 : 0,
+        'duration_ms' => $input['durationMs'] ?? $input['duration_ms'] ?? null,
+        'hit_count' => 1,
+        'first_seen' => date('Y-m-d H:i:s'),
+        'last_seen' => date('Y-m-d H:i:s'),
+        'initiator' => $input['initiator'] ?? null,
+      'request_body' => $requestBodyStr,
         'query_params' => $queryParams,
         'response_body' => $responseBodyStr,
         'status_code' => $input['status'] ?? null,
@@ -433,6 +452,8 @@ class Api extends Controller {
     // Preflight every payload independently before any write. This prevents a mixed
     // batch from being assigned to the first payload's project.
     $payloadProjects = [];
+    $validPayloads = [];
+    $rejectedResults = [];
     foreach ($payloads as $idx => $candidate) {
       $refererHost = $this->normalizeProjectHost($candidate['pageUrl'] ?? '');
       $requestHost = $this->normalizeProjectHost($candidate['url'] ?? '');
@@ -443,104 +464,146 @@ class Api extends Controller {
         if ($score > $matchedScore) { $matchedScore = $score; $matchedProject = $p; $tie = false; }
         elseif ($score >= 0 && $score === $matchedScore) { $tie = true; }
       }
-      if (!$matchedProject || $matchedScore < 0 || $tie) { http_response_code(422); echo json_encode(['status'=>'error','message'=>"Payload $idx domain tidak cocok atau ambigu."]); exit; }
+      if (!$matchedProject || $matchedScore < 0 || $tie) {
+        $rejectedResults[] = [
+          'event_id' => $candidate['eventId'] ?? $candidate['event_id'] ?? null,
+          'status' => 'rejected',
+          'reason' => 'domain tidak cocok atau ambigu'
+        ];
+        continue;
+      }
       $payloadProjects[$idx] = $matchedProject;
+      $validPayloads[$idx] = $candidate;
     }
-    $projectId = $payloadProjects[0]['id'];
-    $endpointModel = $this->m('EndpointModel');
-    $payloadModel = $this->m('PayloadModel');
+    if (count($payloads) > 100) {
+      http_response_code(413);
+      echo json_encode(['status' => 'error', 'message' => 'Maksimal 100 payload per batch.']);
+      exit;
+    }
 
-    // Proses setiap payload
-    $processedCount = 0;
+    $items = [];
+    foreach ($validPayloads as $idx => $pData) {
+        $projectId = (int) $payloadProjects[$idx]['id'];
+        $requestUrl = (string) ($pData['url'] ?? '');
+        $pageUrl = (string) ($pData['pageUrl'] ?? '');
+        $parsed = parse_url($requestUrl);
+        if (!$parsed || empty($parsed['path'])) {
+          $parsed = parse_url($pageUrl . $requestUrl);
+        }
+        $path = $parsed['path'] ?? '/';
+        if ($path === '') $path = '/';
+        $requestHeaders = is_array($pData['requestHeaders'] ?? null) ? $pData['requestHeaders'] : [];
+        $responseHeaders = is_array($pData['responseHeaders'] ?? null) ? $pData['responseHeaders'] : [];
 
-    foreach ($payloads as $idx => $pData) {
-        $projectId = $payloadProjects[$idx]['id'];
-        $path = parse_url($pData['url'], PHP_URL_PATH) ?? '/';
-        $requestHeaders = $pData['requestHeaders'] ?? [];
-        $responseHeaders = $pData['responseHeaders'] ?? [];
-
-        $endpoint = $endpointModel->getByPathAndProjectId($path, $projectId);
-
-        // Identifikasi Methods yang diizinkan
         $allowMethodsStr = '';
+        $contentType = '';
         foreach ($responseHeaders as $key => $val) {
-            if (strtolower($key) === 'access-control-allow-methods') {
-                $allowMethodsStr = $val;
-                break;
-            }
+            $lowerKey = strtolower((string) $key);
+            if ($lowerKey === 'access-control-allow-methods') $allowMethodsStr = (string) $val;
+            if ($lowerKey === 'content-type') $contentType = (string) $val;
         }
 
-        $methods = [
-            'get' => 0, 'post' => 0, 'put' => 0, 'patch' => 0, 
-            'delete' => 0, 'head' => 0, 'option' => 0
-        ];
-
-        if (!empty($allowMethodsStr)) {
-            $allowed = array_map('trim', explode(',', strtolower($allowMethodsStr)));
-            foreach ($allowed as $m) {
-                if ($m === 'options') $m = 'option';
-                if (isset($methods[$m])) {
-                    $methods[$m] = 1;
-                }
+        $methods = ['get'=>0, 'post'=>0, 'put'=>0, 'patch'=>0, 'delete'=>0, 'head'=>0, 'option'=>0];
+        if ($allowMethodsStr !== '') {
+            foreach (array_map('trim', explode(',', strtolower($allowMethodsStr))) as $method) {
+                if ($method === 'options') $method = 'option';
+                if (isset($methods[$method])) $methods[$method] = 1;
             }
         } else {
-            $currentMethod = strtolower($pData['method'] ?? '');
-            if ($currentMethod === 'options') $currentMethod = 'option';
-            if (isset($methods[$currentMethod])) {
-                $methods[$currentMethod] = 1;
-            }
+            $method = strtolower((string) ($pData['method'] ?? 'get'));
+            if ($method === 'options') $method = 'option';
+            if (isset($methods[$method])) $methods[$method] = 1;
         }
 
-        $dataToSave = array_merge([
-            'project_id' => $projectId,
-            'path' => $path,
-            'request_header' => json_encode($requestHeaders)
-        ], $methods);
+        $requestBody = $pData['requestBody'] ?? null;
+        $responseBody = $pData['responseBody'] ?? null;
+        $this->enforceBodyLimit($requestBody);
+        $this->enforceBodyLimit($responseBody);
+        $requestBodyString = is_array($requestBody) ? json_encode($requestBody, JSON_UNESCAPED_SLASHES) : $requestBody;
+        $responseBodyString = is_array($responseBody) ? json_encode($responseBody, JSON_UNESCAPED_SLASHES) : $responseBody;
+        $host = $this->normalizeProjectHost($requestUrl !== '' ? $requestUrl : $pageUrl);
+        $eventId = trim((string) ($pData['eventId'] ?? $pData['event_id'] ?? ''));
+        if ($eventId === '') $eventId = bin2hex(random_bytes(16));
+        $payloadHash = trim((string) ($pData['payloadHash'] ?? ''));
 
-        if ($endpoint) {
-            $endpointModel->updateEndpoint($endpoint['id'], $dataToSave);
-            $endpointId = $endpoint['id'];
-        } else {
-            $endpointId = $endpointModel->createEndpoint($dataToSave);
-        }
-
-        $payloadHash = $pData['payloadHash'] ?? '';
-        // Bulk screenshots must be supplied per payload and are intentionally
-        // ignored here unless the originating tab metadata is available.
-        $screenshotUrl = null;
-        
-        $queryParams = $pData['queryParams'] ?? '';
-        $reqBodyRaw = $pData['requestBody'] ?? null;
-        $this->enforceBodyLimit($reqBodyRaw);
-        $requestBodyStr = is_array($reqBodyRaw) ? json_encode($reqBodyRaw) : $reqBodyRaw;
-        
-        $resBodyRaw = $pData['responseBody'] ?? null;
-        $this->enforceBodyLimit($resBodyRaw);
-        $responseBodyStr = is_array($resBodyRaw) ? json_encode($resBodyRaw) : $resBodyRaw;
-        $responseHeadersStr = is_array($responseHeaders) ? json_encode($responseHeaders) : null;
-        $referer = $pData['pageUrl'] ?? null;
-
-        $payloadData = [
-            'endpoint_id' => $endpointId,
-            'request_body' => $requestBodyStr,
-            'query_params' => $queryParams,
-            'response_body' => $responseBodyStr,
-            'status_code' => $pData['status'] ?? null,
-            'http_method' => $pData['method'] ?? 'GET',
-            'referer' => $referer,
-            'response_header' => $responseHeadersStr,
-            'payload_hash' => $payloadHash,
-            'screenshot' => $screenshotUrl
+        $items[] = [
+          'project_id' => $projectId,
+          'path' => $path,
+          'methods' => $methods,
+          'request_headers' => $requestHeaders,
+          'event_id' => $eventId,
+          'session_id' => $pData['sessionId'] ?? $pData['session_id'] ?? null,
+          'session_title' => $pData['sessionTitle'] ?? $pData['session_title'] ?? null,
+          'session_started_at' => $pData['sessionStartedAt'] ?? $pData['session_started_at'] ?? null,
+          'sequence_no' => $pData['sequenceNo'] ?? $pData['sequence_no'] ?? null,
+          'tab_id' => $pData['tabId'] ?? $pData['tab_id'] ?? null,
+          'frame_id' => $pData['frameId'] ?? $pData['frame_id'] ?? null,
+          'navigation_id' => $pData['navigationId'] ?? $pData['navigation_id'] ?? null,
+          'source_type' => $pData['sourceType'] ?? $pData['source_type'] ?? null,
+          'request_url' => $requestUrl,
+          'host' => $host,
+          'content_type' => $contentType,
+          'request_size' => $requestBodyString === null ? 0 : strlen((string) $requestBodyString),
+          'response_size' => $responseBodyString === null ? 0 : strlen((string) $responseBodyString),
+          'truncated' => !empty($pData['truncated']),
+          'duration_ms' => $pData['durationMs'] ?? $pData['duration_ms'] ?? null,
+          'request_body' => $requestBodyString,
+          'query_params' => $pData['queryParams'] ?? '',
+          'response_body' => $responseBodyString,
+          'status_code' => $pData['status'] ?? null,
+          'http_method' => $pData['method'] ?? 'GET',
+          'referer' => $pageUrl,
+          'response_headers' => $responseHeaders,
+          'payload_hash' => $payloadHash,
+          'screenshot' => null,
+          'initiator' => $pData['initiator'] ?? null
         ];
-
-        $payloadModel->createPayload($payloadData);
-        $processedCount++;
     }
+
+    $captureModel = $this->m('CaptureModel');
+    try {
+      $results = $captureModel->saveBatch($accountId, $items);
+    } catch (Throwable $exception) {
+      error_log('Capture batch failed: ' . $exception->getMessage());
+      http_response_code(503);
+      echo json_encode(['status' => 'error', 'message' => 'Batch capture gagal disimpan; silakan retry.']);
+      exit;
+    }
+    $results = array_merge($rejectedResults, $results);
+    $processedCount = count($results);
+    $storedCount = count(array_filter($results, static fn($result) => ($result['status'] ?? '') === 'stored'));
+    $duplicateCount = count(array_filter($results, static fn($result) => ($result['status'] ?? '') === 'duplicate'));
 
     echo json_encode([
         'status' => 'success',
         'message' => "Berhasil memproses $processedCount payload(s) dari antrean.",
+        'data' => [
+          'processed' => $processedCount,
+          'stored' => $storedCount,
+          'duplicates' => $duplicateCount,
+          'results' => $results
+        ]
     ]);
+    exit;
+  }
+
+  public function sessionEnd() {
+    header('Content-Type: application/json');
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (!preg_match('/^Bearer\s+(\S+)$/i', trim($authHeader), $matches)) {
+      http_response_code(401); echo json_encode(['status' => 'error', 'message' => 'Token tidak ditemukan.']); exit;
+    }
+    $tokenData = $this->m('ExtensionTokenModel')->getByToken($matches[1]);
+    if (!$tokenData) { http_response_code(403); echo json_encode(['status' => 'error', 'message' => 'Token tidak valid.']); exit; }
+    $input = $this->readJsonInput();
+    $sessionId = trim((string) ($input['sessionId'] ?? $input['session_id'] ?? ''));
+    if ($sessionId === '') { http_response_code(422); echo json_encode(['status' => 'error', 'message' => 'session_id wajib diisi.']); exit; }
+    $db = new Database();
+    $db->query('UPDATE capture_sessions SET status="ended", ended_at=NOW(), last_seen_at=NOW() WHERE account_id=:account_id AND session_id=:session_id');
+    $db->bind('account_id', (int) $tokenData['account_id']);
+    $db->bind('session_id', substr($sessionId, 0, 64));
+    $db->exe();
+    echo json_encode(['status' => 'success', 'updated' => $db->row()]);
     exit;
   }
 }

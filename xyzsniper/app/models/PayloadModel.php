@@ -43,26 +43,36 @@ class PayloadModel extends BaseModel {
   }
 
   public function createPayload($data) {
-    if (isset($data['payload_hash']) && isset($data['endpoint_id'])) {
-      $this->db->query('SELECT id FROM payloads WHERE payload_hash = :hash AND endpoint_id = :endpoint_id LIMIT 1');
+    $existing = null;
+    if (!empty($data['event_id'])) {
+      $this->db->query('SELECT id FROM payloads WHERE event_id=:event_id LIMIT 1');
+      $this->db->bind('event_id', $data['event_id']);
+      $existing = $this->db->single();
+    }
+    if (!$existing && !empty($data['payload_hash']) && isset($data['endpoint_id'])) {
+      $this->db->query('SELECT id FROM payloads WHERE payload_hash=:hash AND endpoint_id=:endpoint_id LIMIT 1');
       $this->db->bind('hash', $data['payload_hash']);
       $this->db->bind('endpoint_id', $data['endpoint_id']);
       $existing = $this->db->single();
-      
-      if ($existing) {
-        // Jika sudah ada, replace data yang lama dan perbarui timestamp agar naik ke atas
-        $data['created_at'] = date('Y-m-d H:i:s');
-        
-        // JANGAN timpa screenshot lama menjadi kosong jika tangkapan yang baru tidak memiliki screenshot
-        if (empty($data['screenshot'])) {
-          unset($data['screenshot']);
-        }
-
-        $this->update($existing['id'], $data);
-        return $existing['id'];
-      }
+    }
+    if ($existing) {
+      $id = (int) $existing['id'];
+      $data['last_seen'] = date('Y-m-d H:i:s');
+      unset($data['first_seen'], $data['hit_count'], $data['created_at']);
+      if (empty($data['screenshot'])) unset($data['screenshot']);
+      $fields = [];
+      foreach ($data as $key => $value) $fields[] = "`{$key}`=:{$key}";
+      $fields[] = '`hit_count`=`hit_count`+1';
+      $this->db->query('UPDATE payloads SET ' . implode(', ', $fields) . ' WHERE id=:id');
+      $this->db->bind('id', $id, PDO::PARAM_INT);
+      foreach ($data as $key => $value) $this->db->bind($key, $value);
+      $this->db->exe();
+      return $id;
     }
 
+    if (empty($data['first_seen'])) $data['first_seen'] = date('Y-m-d H:i:s');
+    if (empty($data['last_seen'])) $data['last_seen'] = $data['first_seen'];
+    if (!isset($data['hit_count'])) $data['hit_count'] = 1;
     $this->insert($data);
     return $this->db->lastId();
   }

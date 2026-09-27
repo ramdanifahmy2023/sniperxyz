@@ -76,6 +76,60 @@ class Panel extends Controller {
     $this->v('panel/templates/footer');
   }
 
+  public function sessions() {
+    $data['judul'] = 'Sesi Audit - ' . app_name;
+    $db = new Database();
+    $db->query('SELECT s.*, p.title AS project_title, p.domain,
+      (SELECT COUNT(*) FROM payloads x JOIN endpoints ex ON ex.id=x.endpoint_id WHERE x.session_id=s.session_id AND ex.project_id=s.project_id) AS event_count
+      FROM capture_sessions s JOIN projects p ON p.id=s.project_id
+      WHERE s.account_id=:account_id ORDER BY s.last_seen_at DESC LIMIT 100');
+    $db->bind('account_id', (int) $_SESSION['account']['id']);
+    $data['sessions'] = $db->getAll();
+    $this->v('panel/templates/header', $data);
+    $this->v('panel/sessions', $data);
+    $this->v('panel/templates/footer');
+  }
+
+  public function session($sessionId = null) {
+    if (!$sessionId) { http_response_code(404); exit('Sesi audit tidak ditemukan.'); }
+    $db = new Database();
+    $db->query('SELECT s.*, p.title AS project_title, p.domain FROM capture_sessions s JOIN projects p ON p.id=s.project_id
+      WHERE s.account_id=:account_id AND s.session_id=:session_id LIMIT 1');
+    $db->bind('account_id', (int) $_SESSION['account']['id']);
+    $db->bind('session_id', substr((string) $sessionId, 0, 64));
+    $session = $db->single();
+    if (!$session) { http_response_code(404); exit('Sesi audit tidak ditemukan.'); }
+    $db->query('SELECT p.*, e.path FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id
+      WHERE e.project_id=:project_id AND p.session_id=:session_id ORDER BY p.sequence_no ASC, p.created_at ASC LIMIT 1000');
+    $db->bind('project_id', (int) $session['project_id']);
+    $db->bind('session_id', $session['session_id']);
+    $events = $db->getAll();
+    $data = ['judul' => 'Audit ' . $session['session_id'], 'session' => $session, 'events' => $events];
+    $this->v('panel/templates/header', $data);
+    $this->v('panel/session', $data);
+    $this->v('panel/templates/footer');
+  }
+
+  public function export_session($sessionId = null) {
+    if (!$sessionId) { http_response_code(404); exit; }
+    $db = new Database();
+    $db->query('SELECT s.*, p.title AS project_title, p.domain FROM capture_sessions s JOIN projects p ON p.id=s.project_id
+      WHERE s.account_id=:account_id AND s.session_id=:session_id LIMIT 1');
+    $db->bind('account_id', (int) $_SESSION['account']['id']);
+    $db->bind('session_id', substr((string) $sessionId, 0, 64));
+    $session = $db->single();
+    if (!$session) { http_response_code(404); exit; }
+    $db->query('SELECT p.*, e.path FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id
+      WHERE e.project_id=:project_id AND p.session_id=:session_id ORDER BY p.sequence_no ASC, p.created_at ASC LIMIT 10000');
+    $db->bind('project_id', (int) $session['project_id']);
+    $db->bind('session_id', $session['session_id']);
+    $events = $db->getAll();
+    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Disposition: attachment; filename="sniper-session-' . preg_replace('/[^a-zA-Z0-9_-]/', '-', $session['session_id']) . '.json"');
+    echo json_encode(['session' => $session, 'events' => $events], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    exit;
+  }
+
   public function update_endpoint_label() {
     header('Content-Type: application/json');
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -1,31 +1,30 @@
-// assets/js/content.js
+// Bridge the page's MAIN-world request audit to the extension service worker.
+const navigationId = (() => {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return `nav_${globalThis.crypto.randomUUID()}`;
+  return `nav_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+})();
 
-// Injeksi interceptor.js ke dalam halaman (MAIN world)
 const script = document.createElement('script');
 script.src = chrome.runtime.getURL('assets/js/interceptor.js');
-script.onload = function() {
-    this.remove(); // Bersihkan tag script setelah dimuat
-};
+script.onload = function () { this.remove(); };
 (document.head || document.documentElement).appendChild(script);
 
-// Dengarkan pesan dari interceptor.js
-window.addEventListener('message', function(event) {
-  // Hanya terima pesan dari window yang sama
-  if (event.source !== window) return;
-
-  if (event.data && event.data.source === 'XYZ_SNIPER_INTERCEPT') {
-    // Kirim payload ke background.js dengan try..catch
-    try {
-      chrome.runtime.sendMessage({
-        type: 'XYZ_SNIPER_CAPTURED_REQUEST',
-        data: event.data.payload,
-        pageUrl: window.location.href,
-        userAgent: navigator.userAgent
-      });
-    } catch (err) {
-      if (err.message.includes('Extension context invalidated')) {
-        console.warn('XYZ Sniper: Ekstensi diperbarui. Silakan refresh halaman ini agar ekstensi dapat kembali memantau koneksi.');
-      }
+window.addEventListener('message', function (event) {
+  if (event.source !== window || !event.data || event.data.source !== 'XYZ_SNIPER_INTERCEPT') return;
+  try {
+    chrome.runtime.sendMessage({
+      type: 'XYZ_SNIPER_CAPTURED_REQUEST',
+      data: event.data.payload,
+      pageUrl: window.location.href,
+      userAgent: navigator.userAgent,
+      navigation_id: navigationId,
+      document_id: document.visibilityState ? `${location.origin}:${navigationId}` : navigationId
+    }).catch(error => {
+      if (!String(error && error.message || error).includes('Extension context invalidated')) console.debug('XYZ Sniper: capture bridge unavailable', error);
+    });
+  } catch (error) {
+    if (String(error && error.message || error).includes('Extension context invalidated')) {
+      console.warn('XYZ Sniper: Ekstensi diperbarui. Refresh halaman untuk melanjutkan audit.');
     }
   }
 });
