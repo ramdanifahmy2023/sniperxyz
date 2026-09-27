@@ -7,45 +7,47 @@
   <title>Pair - XYZ Sniper</title>
   <link rel="stylesheet" href="assets/css/basecoat.css">
   <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
   <link rel="stylesheet" href="assets/web_icons/material-symbols.css">
   <style>
-    body {
-      width: 350px;
-      margin: 0;
-      padding: 0;
-    }
-
-    .card-ext {
-      border-radius: 0;
-      box-shadow: none;
-      margin: 0;
-      border: none;
-    }
+    body { width: 350px; }
   </style>
 </head>
 
-<body>
+<body class="sniper-extension">
   <div class="card card-ext">
-    <header>
-      <h2>Memasang Ekstensi ke Akun Anda</h2>
-      <p>Silahkan masukkan kode pas 8 digit</p>
+    <header class="sniper-header">
+      <div class="pair-header">
+        <h2>Memasang Ekstensi ke Akun Anda</h2>
+        <p>Silahkan masukkan kode pas 8 digit</p>
+      </div>
+      <label class="sniper-theme-control" title="Tema tampilan">
+        <span class="material-symbols-outlined" aria-hidden="true">contrast</span>
+        <span class="sr-only">Tema</span>
+        <select id="theme-select" class="sniper-theme-select" data-theme-select aria-label="Tema tampilan">
+          <option value="system">Sistem</option>
+          <option value="light">Terang</option>
+          <option value="dark">Gelap</option>
+        </select>
+      </label>
     </header>
-    <section>
+    <section class="pair-shell">
       <form class="login-form">
         <div class="login-copy" style="position: relative;">
           <label class="label" for="passcode" style="display: flex; align-items: center; gap: 0.25rem;">
-            <span class="material-symbols-outlined" style="font-size: 1.125rem; color: #eab308;">bolt</span> Kode Pas Kilat
+            <span class="material-symbols-outlined pair-icon" aria-hidden="true">bolt</span> Kode Pas Kilat
           </label>
           <input class="input text-center" type="text" id="passcode" placeholder="PASSCODE" required autofocus maxlength="8" inputmode="numeric" style="letter-spacing: 0.4em; font-weight: bold; font-size: 1.125rem;" />
-          <p id="pair-status" class="text-sm font-medium text-center" style="color: #ef4444; position: absolute; bottom: -22px; left: 0; right: 0; margin: 0;"></p>
+          <p id="pair-status" class="pair-status text-sm font-medium text-center" data-state="error" style="position: absolute; bottom: -22px; left: 0; right: 0; margin: 0;"></p>
         </div>
       </form>
     </section>
-    <footer class="login-actions">
+    <footer class="login-actions" style="padding: 0 1.25rem 1.25rem;">
       <button type="button" id="btn-pair" class="btn btn-primary">Pasangkan</button>
     </footer>
   </div>
   <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
   <script src="assets/js/pair.js"></script>
 </body>
 

@@ -21,7 +21,7 @@
           <div role="group" class="fieldset">
             <div role="group" class="field">
               <label for="currentEmail">Email Saat Ini</label>
-              <input type="email" id="currentEmail" value="<?= htmlspecialchars($_SESSION['account']['email'] ?? ''); ?>" disabled style="background-color: rgba(128,128,128,0.1); color: var(--color-muted-foreground);" />
+              <input type="email" id="currentEmail" value="<?= htmlspecialchars($_SESSION['account']['email'] ?? ''); ?>" disabled style="background-color: color-mix(in srgb, var(--color-foreground) 8%, transparent); color: var(--color-muted-foreground);" />
             </div>
             <div role="group" class="field">
               <label for="newEmail">Email Baru</label>
@@ -43,7 +43,7 @@
           <?php if (!empty($_SESSION['account']['password'])): ?>
             <p>Perbarui kata sandi akun Anda.</p>
           <?php else: ?>
-            <p style="color: var(--color-destructive, #ef4444); font-weight: 500;">Akun Anda belum memiliki kata sandi</p>
+            <p style="color: var(--color-destructive); font-weight: 500;">Akun Anda belum memiliki kata sandi</p>
           <?php endif; ?>
         </div>
       </header>
@@ -180,14 +180,13 @@
         const originalStyle = btn.getAttribute('style') || '';
         
         btn.disabled = true;
-        btn.style.backgroundColor = '#22c55e';
-        btn.style.color = '#ffffff';
-        btn.style.borderColor = '#22c55e';
+        btn.dataset.state = 'success';
         btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; margin-right: 4px;">check</span>Tersalin!';
         
         setTimeout(() => {
           btn.disabled = false;
           btn.setAttribute('style', originalStyle);
+          delete btn.dataset.state;
           btn.innerHTML = originalHtml;
         }, 2000);
       };
@@ -300,11 +299,11 @@
           passwordValidationMsg.style.display = 'block';
           if (!isMatch) {
             passwordValidationMsg.textContent = 'Kata sandi tidak cocok.';
-            passwordValidationMsg.style.color = 'var(--color-destructive, #ef4444)';
+            passwordValidationMsg.style.color = 'var(--color-destructive)';
             confirmPasswordField.setAttribute('data-invalid', 'true');
           } else {
             passwordValidationMsg.textContent = 'Kata sandi cocok.';
-            passwordValidationMsg.style.color = '#22c55e';
+            passwordValidationMsg.style.color = 'var(--color-success)';
             confirmPasswordField.removeAttribute('data-invalid');
           }
         } else {

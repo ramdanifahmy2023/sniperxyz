@@ -47,18 +47,18 @@
                 
                 // Menentukan warna badge status code
                 $badge = 'outline';
-                $badgeStyle = '';
+                $badgeTone = '';
                 if ($status >= 200 && $status < 300) {
                   // Berhasil (Hijau)
                   $badge = 'primary';
-                  $badgeStyle = 'background-color: #16a34a; border-color: #16a34a; color: #fff;';
+                  $badgeTone = 'status-badge-success';
                 } elseif ($status >= 300 && $status < 400) {
                   // Redirect
                   $badge = 'secondary';
                 } elseif ($status >= 400 && $status < 500) {
                   // Client Error (Orange/Red)
                   $badge = 'destructive';
-                  $badgeStyle = 'background-color: #ea580c; border-color: #ea580c;';
+                  $badgeTone = 'status-badge-warning';
                 } elseif ($status >= 500) {
                   // Server Error (Merah)
                   $badge = 'destructive';
@@ -102,7 +102,7 @@
               ?>
               <tr>
                 <td>
-                  <span class="badge" data-variant="<?= $badge ?>" style="font-size: 0.7rem; min-width: 40px; justify-content: center; <?= $badgeStyle ?>"><?= $status ?></span>
+                  <span class="badge <?= $badgeTone ?>" data-variant="<?= $badge ?>" style="font-size: 0.7rem; min-width: 40px; justify-content: center;"><?= $status ?></span>
                 </td>
                 <td>
                   <span class="badge" data-variant="<?= $method_badge ?>" style="font-size: 0.7rem; min-width: 50px; justify-content: center;"><?= $method ?></span>
@@ -159,7 +159,7 @@
     </article>
   <?php else: ?>
   <section class="empty" style="margin-top: 40px; padding: 60px 20px; text-align: center;">
-    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: rgba(128,128,128,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: color-mix(in srgb, var(--color-foreground) 8%, transparent); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
       <span class="material-symbols-outlined" style="font-size: 32px; opacity: 0.5;">folder_off</span>
     </div>
     <h2 style="margin-bottom: 8px;">Tidak ada proyek aktif</h2>
@@ -180,7 +180,7 @@
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectTitle">Judul Proyek</label>
               <input type="text" placeholder="Masukkan judul proyek..." id="newProjectTitle" name="title" autofocus required />
-              <span id="errorTitle" style="color: #ef4444; font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Judul sudah digunakan</span>
+              <span id="errorTitle" class="inline-field-error" style="font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Judul sudah digunakan</span>
             </div>
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectDomain">Target Domain</label>
@@ -190,7 +190,7 @@
                   <span class="material-symbols-outlined" style="font-size: 18px;">language</span>
                 </span>
               </div>
-              <span id="errorDomain" style="color: #ef4444; font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Domain sudah digunakan</span>
+              <span id="errorDomain" class="inline-field-error" style="font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Domain sudah digunakan</span>
             </div>
           </div>
         </form>

@@ -1,0 +1,353 @@
+/* Sniper extension theme tokens. Font families remain owned by Basecoat. */
+:root {
+  --sniper-bg: #faf7f2;
+  --sniper-surface: #ffffff;
+  --sniper-surface-muted: #f4efe8;
+  --sniper-ink: #1a1714;
+  --sniper-muted: #6c6258;
+  --sniper-subtle: #9a8f83;
+  --sniper-border: #ded6ca;
+  --sniper-border-strong: #c8bcad;
+  --sniper-accent: #e98425;
+  --sniper-accent-ink: #1a1714;
+  --sniper-success: #18794e;
+  --sniper-success-surface: #e3f4e9;
+  --sniper-warning: #9a5b08;
+  --sniper-warning-surface: #fff1d5;
+  --sniper-danger: #b42318;
+  --sniper-danger-surface: #fde8e7;
+  --sniper-focus: rgba(233, 132, 37, 0.34);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --sniper-bg: #14110e;
+  --sniper-surface: #211c17;
+  --sniper-surface-muted: #2a241e;
+  --sniper-ink: #f5efe4;
+  --sniper-muted: #c1b6a9;
+  --sniper-subtle: #998d80;
+  --sniper-border: #514538;
+  --sniper-border-strong: #6b5a49;
+  --sniper-accent: #e98425;
+  --sniper-accent-ink: #1a1714;
+  --sniper-success: #73d19c;
+  --sniper-success-surface: #1d392b;
+  --sniper-warning: #f4bd62;
+  --sniper-warning-surface: #3c2b13;
+  --sniper-danger: #ff9d96;
+  --sniper-danger-surface: #45211f;
+  --sniper-focus: rgba(233, 132, 37, 0.44);
+  color-scheme: dark;
+}
+
+:root[data-theme="system"] {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --sniper-bg: #14110e;
+    --sniper-surface: #211c17;
+    --sniper-surface-muted: #2a241e;
+    --sniper-ink: #f5efe4;
+    --sniper-muted: #c1b6a9;
+    --sniper-subtle: #998d80;
+    --sniper-border: #514538;
+    --sniper-border-strong: #6b5a49;
+    --sniper-success: #73d19c;
+    --sniper-success-surface: #1d392b;
+    --sniper-warning: #f4bd62;
+    --sniper-warning-surface: #3c2b13;
+    --sniper-danger: #ff9d96;
+    --sniper-danger-surface: #45211f;
+    --sniper-focus: rgba(233, 132, 37, 0.44);
+    color-scheme: dark;
+  }
+}
+
+body.sniper-extension {
+  width: 350px;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: var(--sniper-bg);
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sniper-extension .card-ext {
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--sniper-bg);
+  box-shadow: none;
+  color: var(--sniper-ink);
+}
+
+.sniper-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--sniper-border);
+}
+
+.sniper-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sniper-brand img {
+  width: 1.6rem;
+  height: 1.6rem;
+  object-fit: contain;
+}
+
+.sniper-brand h2 {
+  margin: 0;
+  color: var(--sniper-ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.sniper-status,
+.sniper-muted,
+.sniper-copy-status,
+.sniper-queue-status {
+  color: var(--sniper-muted);
+}
+
+.sniper-status {
+  margin: 0.35rem 1rem 0;
+  font-size: 0.75rem;
+}
+
+.sniper-theme-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--sniper-muted);
+  font-size: 0.68rem;
+}
+
+.sniper-theme-control .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.sniper-theme-select {
+  min-height: 1.8rem;
+  max-width: 5.3rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--sniper-border);
+  border-radius: 0.35rem;
+  background: var(--sniper-surface);
+  color: var(--sniper-ink);
+  font: inherit;
+  font-size: 0.68rem;
+}
+
+.sniper-theme-select:focus,
+.sniper-extension input:focus,
+.sniper-extension button:focus-visible {
+  outline: 2px solid var(--sniper-focus);
+  outline-offset: 1px;
+}
+
+.sniper-extension #main-section {
+  padding: 0.85rem 1rem 1rem;
+}
+
+.sniper-extension #main-section > .card,
+.sniper-extension #project-info {
+  border: 1px solid var(--sniper-border);
+  border-radius: 0.65rem;
+  background: var(--sniper-surface);
+  color: var(--sniper-ink);
+}
+
+.sniper-extension #main-section > .card {
+  margin-bottom: 0.75rem;
+}
+
+.sniper-extension .profile-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.sniper-extension .profile-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--sniper-surface-muted);
+  color: var(--sniper-muted);
+}
+
+.sniper-extension .profile-email,
+.sniper-extension .section-label,
+.sniper-extension .project-domain,
+.sniper-extension .mcp-helper,
+.sniper-extension .mcp-copy-status,
+.sniper-extension .queue-status {
+  color: var(--sniper-muted);
+}
+
+.sniper-extension .section-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sniper-extension .project-domain {
+  color: var(--sniper-accent);
+}
+
+.sniper-extension .capture-controls,
+.sniper-extension .mcp-info {
+  border-color: var(--sniper-border) !important;
+}
+
+.sniper-extension .queue-status {
+  width: 100%;
+}
+
+.sniper-extension .btn,
+.sniper-extension button {
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .btn[data-variant="primary"],
+.sniper-extension .btn-primary {
+  border-color: var(--sniper-accent);
+  background: var(--sniper-accent);
+  color: var(--sniper-accent-ink);
+}
+
+.sniper-extension .btn[data-variant="outline"],
+.sniper-extension .btn-outline {
+  border-color: var(--sniper-border-strong);
+  background: transparent;
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .btn:hover,
+.sniper-extension .icon-button:hover {
+  filter: brightness(0.96);
+}
+
+.sniper-extension .capture-status,
+.sniper-extension .badge {
+  border: 1px solid var(--sniper-border);
+  background: var(--sniper-surface-muted);
+  color: var(--sniper-muted);
+}
+
+.sniper-extension .capture-status[data-variant="primary"],
+.sniper-extension .badge[data-variant="primary"] {
+  border-color: transparent;
+  background: var(--sniper-success-surface);
+  color: var(--sniper-success);
+}
+
+.sniper-extension .mcp-input {
+  min-width: 0;
+  border: 1px solid var(--sniper-border);
+  border-radius: 0.35rem;
+  background: var(--sniper-surface-muted);
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .icon-button {
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--sniper-muted);
+  cursor: pointer;
+}
+
+.sniper-extension .icon-button .material-symbols-outlined {
+  font-size: 1.25rem;
+}
+
+.sniper-extension #copy-mcp-config-btn .material-symbols-outlined {
+  margin-right: 0.35rem;
+  font-size: 1rem;
+}
+
+.sniper-extension .icon-button[data-state="success"] {
+  color: var(--sniper-success);
+}
+
+.sniper-extension .mcp-copy-status[data-state="success"] {
+  color: var(--sniper-success);
+}
+
+.sniper-extension .mcp-copy-status[data-state="error"] {
+  color: var(--sniper-danger);
+}
+
+.sniper-extension .no-project {
+  color: var(--sniper-danger);
+}
+
+.sniper-extension code {
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .pair-shell {
+  padding: 1.25rem;
+}
+
+.sniper-extension .pair-header h2 {
+  margin: 0;
+  color: var(--sniper-ink);
+}
+
+.sniper-extension .pair-header p {
+  margin: 0.35rem 0 0;
+  color: var(--sniper-muted);
+}
+
+.sniper-extension .pair-icon {
+  color: var(--sniper-accent);
+}
+
+.sniper-extension .pair-status[data-state="error"] {
+  color: var(--sniper-danger);
+}
+
+.sniper-extension .pair-status[data-state="pending"] {
+  color: var(--sniper-muted);
+}
+
+.sniper-extension .pair-status[data-state="success"] {
+  color: var(--sniper-success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sniper-extension *,
+  .sniper-extension *::before,
+  .sniper-extension *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

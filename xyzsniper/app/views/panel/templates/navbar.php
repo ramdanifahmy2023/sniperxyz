@@ -45,19 +45,15 @@
     </nav>
 
     <div class="panel-topbar-actions">
-      <button
-        type="button"
-        class="btn panel-theme-toggle"
-        data-variant="ghost"
-        data-size="icon-sm"
-        data-theme-toggle
-        data-tooltip="Aktifkan mode gelap"
-        data-side="bottom"
-        data-align="end"
-        aria-label="Aktifkan mode gelap"
-      >
-        <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
-      </button>
+      <label class="panel-theme-control" for="panel-theme-select">
+        <span class="material-symbols-outlined" aria-hidden="true">contrast</span>
+        <span>Tema</span>
+        <select id="panel-theme-select" data-theme-select aria-label="Tema tampilan">
+          <option value="system">Sistem</option>
+          <option value="light">Terang</option>
+          <option value="dark">Gelap</option>
+        </select>
+      </label>
     </div>
   </div>
 </header>

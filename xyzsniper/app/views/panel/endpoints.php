@@ -353,7 +353,7 @@ if (!empty($data['projects'])) {
     </script>
   <?php else: ?>
   <section class="empty" style="margin-top: 40px; padding: 60px 20px; text-align: center;">
-    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: rgba(128,128,128,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: color-mix(in srgb, var(--color-foreground) 8%, transparent); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
       <span class="material-symbols-outlined" style="font-size: 32px; opacity: 0.5;">folder_off</span>
     </div>
     <h2 style="margin-bottom: 8px;">Tidak ada proyek aktif</h2>
@@ -374,7 +374,7 @@ if (!empty($data['projects'])) {
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectTitle">Judul Proyek</label>
               <input type="text" placeholder="Masukkan judul proyek..." id="newProjectTitle" name="title" autofocus required />
-              <span id="errorTitle" style="color: #ef4444; font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Judul sudah digunakan</span>
+              <span id="errorTitle" class="inline-field-error" style="font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Judul sudah digunakan</span>
             </div>
             <div role="group" class="field" style="position: relative;">
               <label for="newProjectDomain">Target Domain</label>
@@ -384,7 +384,7 @@ if (!empty($data['projects'])) {
                   <span class="material-symbols-outlined" style="font-size: 18px;">language</span>
                 </span>
               </div>
-              <span id="errorDomain" style="color: #ef4444; font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Domain sudah digunakan</span>
+              <span id="errorDomain" class="inline-field-error" style="font-size: 0.75rem; position: absolute; bottom: -20px; left: 0; display: none;">Domain sudah digunakan</span>
             </div>
           </div>
         </form>

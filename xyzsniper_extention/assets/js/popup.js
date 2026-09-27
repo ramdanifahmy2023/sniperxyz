@@ -62,8 +62,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 mcpUrlEl.addEventListener('click', () => {
                     navigator.clipboard.writeText(mcpUrlEl.value);
                     const btn = document.getElementById('copy-mcp-btn');
-                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1.25rem; color: #10b981;">check</span>';
-                    setTimeout(() => btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1.25rem;">content_copy</span>', 2000);
+                    btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>';
+                    btn.dataset.state = 'success';
+                    setTimeout(() => {
+                      btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>';
+                      delete btn.dataset.state;
+                    }, 2000);
                 });
                 document.getElementById('copy-mcp-btn').addEventListener('click', () => {
                     mcpUrlEl.click();
@@ -85,14 +89,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                       await navigator.clipboard.writeText(config);
                       copyStatus.textContent = 'Akses MCP tersalin. Siap ditempel ke terminal atau agent.';
-                      copyStatus.style.color = '#059669';
-                      copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 0.35rem;">check</span>Tersalin';
+                      copyStatus.dataset.state = 'success';
+                      copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>Tersalin';
                       window.setTimeout(() => {
-                        copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 0.35rem;">content_copy</span>Salin akses MCP lengkap';
+                        copyConfigBtn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Salin akses MCP lengkap';
                       }, 2200);
                     } catch (error) {
                       copyStatus.textContent = 'Clipboard tidak tersedia. Salin URL dan token secara manual.';
-                      copyStatus.style.color = '#dc2626';
+                      copyStatus.dataset.state = 'error';
                     }
                   });
                 }

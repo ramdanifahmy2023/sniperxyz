@@ -7,7 +7,7 @@
   </div>
 
   <section class="empty" style="margin-top: 24px; padding: 60px 20px; text-align: center;">
-    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: rgba(128,128,128,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+    <div class="empty-icon" style="margin: 0 auto 16px; width: 64px; height: 64px; background: color-mix(in srgb, var(--color-foreground) 8%, transparent); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
       <span class="material-symbols-outlined" style="font-size: 32px; opacity: 0.5;">extension</span>
     </div>
     <h2 style="margin-bottom: 8px;">Integrasi Ekstensi Chrome</h2>

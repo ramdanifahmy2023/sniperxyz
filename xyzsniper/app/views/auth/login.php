@@ -1,4 +1,13 @@
 <main class="login-page">
+  <label class="login-theme-control" for="login-theme-select">
+    <span class="material-symbols-outlined" aria-hidden="true">contrast</span>
+    <span>Tema tampilan</span>
+    <select id="login-theme-select" data-theme-select aria-label="Tema tampilan">
+      <option value="system">Sistem</option>
+      <option value="light">Terang</option>
+      <option value="dark">Gelap</option>
+    </select>
+  </label>
   <div class="card login-card">
     <header class="login-header">
       <div class="login-icon">

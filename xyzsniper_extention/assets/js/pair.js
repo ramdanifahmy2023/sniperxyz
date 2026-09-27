@@ -6,6 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputPasscode = document.getElementById('passcode');
   const statusText = document.getElementById('pair-status');
 
+  const setStatus = (message, state) => {
+    statusText.innerText = message;
+    statusText.dataset.state = state;
+  };
+
   // Hanya perbolehkan input angka
   inputPasscode.addEventListener('input', (e) => {
     e.target.value = e.target.value.replace(/[^0-9]/g, '');
@@ -15,13 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const passcode = inputPasscode.value.trim();
     
     if (!passcode) {
-      statusText.innerText = 'Please enter a passcode.';
-      statusText.style.color = '#ef4444';
+      setStatus('Please enter a passcode.', 'error');
       return;
     }
 
-    statusText.innerText = 'Connecting...';
-    statusText.style.color = 'black';
+    setStatus('Connecting...', 'pending');
     btnPair.disabled = true;
 
     fetch(API_URL, {
@@ -36,8 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.status === 'success' && data.data && data.data.token) {
         // Simpan token ke storage
         chrome.storage.local.set({ apiToken: data.data.token }, () => {
-          statusText.innerText = 'Connected successfully!';
-          statusText.style.color = 'green';
+          setStatus('Connected successfully!', 'success');
           
           // Kembali ke index.html
           setTimeout(() => {
@@ -45,15 +47,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }, 1000);
         });
       } else {
-        statusText.innerText = data.message || 'Invalid passcode.';
-        statusText.style.color = '#ef4444';
+        setStatus(data.message || 'Invalid passcode.', 'error');
         btnPair.disabled = false;
       }
     })
     .catch(error => {
       console.error('Error:', error);
-      statusText.innerText = 'Gagal terhubung ke server. Silakan coba lagi.';
-      statusText.style.color = '#ef4444';
+      setStatus('Gagal terhubung ke server. Silakan coba lagi.', 'error');
       btnPair.disabled = false;
     });
   });

@@ -8,99 +8,98 @@
   <!-- Menghubungkan CSS Basecoat dan App -->
   <link rel="stylesheet" href="assets/css/basecoat.css">
   <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
   <link rel="stylesheet" href="assets/web_icons/material-symbols.css">
   <style>
-    body {
-      width: 350px;
-      /* Lebar default untuk popup extension */
-      margin: 0;
-      padding: 0;
-    }
-
-    .card-ext {
-      border: none;
-      box-shadow: none;
-      border-radius: 0;
-    }
+    /* Keep popup sizing local to this document; theme values live in theme.css. */
+    body { width: 350px; }
   </style>
 </head>
 
-<body>
+<body class="sniper-extension">
   <div class="card card-ext">
-    <header style="text-align: center;">
-      <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-        <img src="assets/images/logo.png" alt="XYZ Sniper" style="width: 24px; height: auto;" />
-        <h2 style="margin: 0; font-size: 1.25rem; font-weight: bold; font-style: italic;">XYZ Sniper</h2>
+    <header class="sniper-header">
+      <div class="sniper-brand">
+        <img src="assets/images/logo.png" alt="XYZ Sniper" />
+        <h2>XYZ Sniper</h2>
       </div>
-      <p id="status" style="margin-top: 0.25rem; font-size: 0.875rem; color: #64748b;">Checking authentication...</p>
+      <label class="sniper-theme-control" title="Tema tampilan">
+        <span class="material-symbols-outlined" aria-hidden="true">contrast</span>
+        <span class="sr-only">Tema</span>
+        <select id="theme-select" class="sniper-theme-select" data-theme-select aria-label="Tema tampilan">
+          <option value="system">Sistem</option>
+          <option value="light">Terang</option>
+          <option value="dark">Gelap</option>
+        </select>
+      </label>
     </header>
+    <p id="status" class="sniper-status">Checking authentication...</p>
 
-    <section id="main-section" style="display: none; padding: 1rem; padding-top: 0;">
+    <section id="main-section" style="display: none;">
       <!-- Card Profil -->
-      <div class="card"
-        style="margin-bottom: 1rem; padding: 0.75rem 1rem; display: flex; flex-direction: row; align-items: center; gap: 0.75rem;">
-        <div
-          style="width: 40px; height: 40px; border-radius: 50%; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+      <div class="card profile-card">
+        <div class="profile-avatar" style="display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
           <img id="user-avatar" src="" alt="Avatar"
             style="width: 100%; height: 100%; object-fit: cover; display: none;" />
           <span id="user-avatar-fallback" class="material-symbols-outlined"
-            style="color: #94a3b8; font-size: 1.25rem;">person</span>
+            style="font-size: 1.25rem;">person</span>
         </div>
         <div style="overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
           <h3 id="user-name"
             style="margin: 0; font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             Memuat...</h3>
           <p id="user-email"
-            style="margin: 0; font-size: 0.75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            class="profile-email"
+            style="margin: 0; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             -</p>
         </div>
       </div>
 
       <!-- Card Proyek -->
       <div class="card" style="padding: 1rem;">
-        <h3
-          style="margin: 0 0 0.5rem 0; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
+        <h3 class="section-label">
           Proyek Aktif</h3>
         <div id="project-info">
           <h4 id="project-title"
             style="margin: 0; font-size: 1rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             -</h4>
           <p id="project-domain"
-            style="margin: 0; font-size: 0.875rem; color: #3b82f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            class="project-domain"
+            style="margin: 0; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             -</p>
 
-          <div id="capture-controls" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <div id="capture-controls" class="capture-controls" style="margin-top: 0.75rem; padding-top: 0.75rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
             <span id="capture-status" class="badge" data-variant="primary">Audit aktif</span>
             <button id="toggle-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Pause</button>
             <button id="end-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Akhiri sesi</button>
-            <small id="capture-queue-status" style="width:100%;color:#64748b;">Queue: memuat...</small>
+            <small id="capture-queue-status" class="queue-status">Queue: memuat...</small>
           </div>
 
-          <div id="mcp-info" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; display: none;">
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">
+          <div id="mcp-info" class="mcp-info" style="margin-top: 1rem; padding-top: 1rem; display: none;">
+            <h3 class="section-label">
               MCP Server URL</h3>
             <div style="display: flex; gap: 4px; align-items: center;">
-              <input type="text" id="mcp-url" readonly style="flex: 1; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; color: #475569; background-color: #f8fafc; outline: none; cursor: copy;" title="Klik untuk menyalin">
-              <button id="copy-mcp-btn" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px;" title="Salin URL">
-                 <span class="material-symbols-outlined" style="font-size: 1.25rem;">content_copy</span>
+              <input type="text" id="mcp-url" class="mcp-input" readonly style="flex: 1; padding: 4px 8px; font-size: 0.75rem; outline: none; cursor: copy;" title="Klik untuk menyalin">
+              <button id="copy-mcp-btn" class="icon-button" title="Salin URL">
+                 <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
               </button>
             </div>
-            <p style="margin: 0.5rem 0 0.25rem; font-size: 0.7rem; color: #64748b;">Gunakan header <code>Authorization: Bearer</code> saat menghubungkan MCP.</p>
+            <p class="mcp-helper" style="margin: 0.5rem 0 0.25rem; font-size: 0.7rem;">Gunakan header <code>Authorization: Bearer</code> saat menghubungkan MCP.</p>
             <div style="display: flex; gap: 4px; align-items: center;">
-              <input type="password" id="mcp-token" readonly style="flex: 1; padding: 4px 8px; font-size: 0.7rem; border: 1px solid #cbd5e1; border-radius: 4px; color: #475569; background-color: #f8fafc; outline: none; cursor: copy;" title="Klik untuk menyalin token">
-              <button id="copy-mcp-token-btn" type="button" style="background: none; border: none; cursor: pointer; color: #64748b; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 4px;" title="Salin token">
-                <span class="material-symbols-outlined" style="font-size: 1.25rem;">key</span>
+              <input type="password" id="mcp-token" class="mcp-input" readonly style="flex: 1; padding: 4px 8px; font-size: 0.7rem; outline: none; cursor: copy;" title="Klik untuk menyalin token">
+              <button id="copy-mcp-token-btn" type="button" class="icon-button" title="Salin token">
+                <span class="material-symbols-outlined" aria-hidden="true">key</span>
               </button>
             </div>
             <button id="copy-mcp-config-btn" type="button" class="btn" data-variant="primary" style="width: 100%; margin-top: 0.75rem; justify-content: center;">
-              <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 0.35rem;">content_copy</span>
+              <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
               Salin akses MCP lengkap
             </button>
-            <small id="mcp-copy-status" role="status" aria-live="polite" style="display: block; min-height: 1rem; margin-top: 0.35rem; color: #64748b; text-align: center;"></small>
+            <small id="mcp-copy-status" class="mcp-copy-status" role="status" aria-live="polite" style="display: block; min-height: 1rem; margin-top: 0.35rem; text-align: center;"></small>
           </div>
         </div>
         <div id="no-project" style="display: none;">
-          <p style="margin: 0; font-size: 0.875rem; color: #ef4444; font-style: italic;">Belum ada proyek yang dipilih.
+          <p class="no-project" style="margin: 0; font-size: 0.875rem; font-style: italic;">Belum ada proyek yang dipilih.
           </p>
         </div>
       </div>
@@ -109,6 +108,7 @@
 
   </div>
   <script src="assets/js/config.js"></script>
+  <script src="assets/js/theme.js"></script>
   <script src="assets/js/popup.js"></script>
 </body>
 

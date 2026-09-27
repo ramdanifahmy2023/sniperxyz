@@ -10,11 +10,12 @@
     (() => {
       try {
         const storedTheme = localStorage.getItem('themeMode');
+        const mode = ['light', 'dark', 'system'].includes(storedTheme) ? storedTheme : 'system';
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-        if (storedTheme ? storedTheme === 'dark' : prefersDark) {
-          document.documentElement.classList.add('dark');
-        }
+        const dark = mode === 'dark' || (mode === 'system' && prefersDark);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.dataset.theme = mode;
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
       } catch (_) {}
     })();
   </script>
@@ -23,6 +24,7 @@
   <link rel="stylesheet" href="<?= assets; ?>/css/app.css">
   <link rel="stylesheet" href="<?= web_icons; ?>/material-symbols.css">
   <script src="<?= assets; ?>/css/basecoat/js/all.min.js" defer></script>
+  <script src="<?= assets; ?>/js/theme.js" defer></script>
 </head>
 <body class="app-shell">
   <?php $this->v('panel/templates/sidebar'); ?>
