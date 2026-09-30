@@ -2,6 +2,28 @@
 
 Bayangin ada tiga teman: **ekstensi mencatat**, **webapp menyimpan**, lalu **AI membaca catatannya**. Kalau halaman belum kamu buka, catatannya juga belum ada.
 
+## Login untuk banyak user lewat Google
+
+Sniper sudah punya tombol **Masuk dengan Google**. Supaya user dari luar akun Google Workspace juga boleh masuk, di Google Cloud pilih **OAuth consent screen → External**. Tambahkan scope `openid`, `email`, dan `profile`, lalu buat OAuth client dengan tipe **Web application**.
+
+Isi redirect URI sesuai alamat webapp:
+
+```text
+http://localhost:8000/ProcAuth/googleCallback
+https://domain-kamu.com/ProcAuth/googleCallback
+```
+
+Masukkan Client ID dan Client Secret ke `.env` server:
+
+```ini
+GOOGLE_CLIENT_ID="...apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="GOCSPX-..."
+```
+
+Untuk mode **Testing**, Google hanya mengizinkan email yang ada di daftar **Test users**. Tambahkan email user di sana. Saat aplikasi siap untuk umum, lengkapi verifikasi Google dan ubah status publikasi sesuai aturan Google. Secret hanya disimpan di server; jangan dimasukkan ke ekstensi atau Git.
+
+Setelah server direstart, user cukup membuka `/auth`, klik **Masuk dengan Google**, lalu menyetujui akses. Sniper membuat akun baru berdasarkan email Google terverifikasi, atau menyambungkan akun lama dengan email yang sama. Akun baru bisa langsung membuat proyek dan mengambil Kode Pas Kilat untuk menghubungkan ekstensi.
+
 ## 1. Perbarui dulu
 
 Untuk instalasi lokal yang sudah ada:
