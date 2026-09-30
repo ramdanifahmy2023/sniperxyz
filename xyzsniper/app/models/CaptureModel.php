@@ -28,21 +28,23 @@ class CaptureModel extends BaseModel {
     $requestHeaders = $item['request_headers'] ?? [];
     $requestHeaderJson = is_string($requestHeaders) ? $requestHeaders : json_encode($requestHeaders, JSON_UNESCAPED_SLASHES);
 
-    $this->db->query('SELECT id FROM projects WHERE id=:project_id AND account_id=:account_id LIMIT 1');
+    $this->db->query('SELECT id FROM projects WHERE id=:project_id AND account_id=:account_id LIMIT 1 FOR UPDATE');
     $this->db->bind('project_id', $projectId);
     $this->db->bind('account_id', $accountId);
     if (!$this->db->single()) {
       throw new RuntimeException('Project capture tidak dimiliki akun token.');
     }
 
-    $this->db->query('INSERT INTO endpoints (project_id,path,request_header,`get`,post,put,patch,`delete`,head,`option`)
-      VALUES (:project_id,:path,:request_header,:get,:post,:put,:patch,:delete,:head,:option)
+    $this->db->query('INSERT INTO endpoints (project_id,path,origin,endpoint_key,request_header,`get`,post,put,patch,`delete`,head,`option`)
+      VALUES (:project_id,:path,:origin,:endpoint_key,:request_header,:get,:post,:put,:patch,:delete,:head,:option)
       ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), request_header=IF(VALUES(request_header) <> "", VALUES(request_header), request_header),
       `get`=GREATEST(`get`,VALUES(`get`)), post=GREATEST(post,VALUES(post)), put=GREATEST(put,VALUES(put)),
       patch=GREATEST(patch,VALUES(patch)), `delete`=GREATEST(`delete`,VALUES(`delete`)), head=GREATEST(head,VALUES(head)),
       `option`=GREATEST(`option`,VALUES(`option`))');
     $this->db->bind('project_id', $projectId);
     $this->db->bind('path', $path);
+    $this->db->bind('origin', $item['origin'] ?? '');
+    $this->db->bind('endpoint_key', $item['endpoint_key'] ?? hash('sha256', $path));
     $this->db->bind('request_header', $requestHeaderJson ?: '');
     foreach (['get','post','put','patch','delete','head','option'] as $method) {
       $this->db->bind($method, !empty($methods[$method]) ? 1 : 0, PDO::PARAM_INT);
@@ -58,7 +60,7 @@ class CaptureModel extends BaseModel {
     if ($sessionId !== '') {
       $this->db->query('INSERT INTO capture_sessions (session_id,account_id,project_id,title,status,started_at,last_seen_at)
         VALUES (:session_id,:account_id,:project_id,:title,"active",COALESCE(:started_at,NOW()),NOW())
-        ON DUPLICATE KEY UPDATE last_seen_at=NOW(), status="active"');
+        ON DUPLICATE KEY UPDATE last_seen_at=NOW()');
       $this->db->bind('session_id', substr($sessionId, 0, 64));
       $this->db->bind('account_id', $accountId);
       $this->db->bind('project_id', $projectId);
@@ -71,25 +73,24 @@ class CaptureModel extends BaseModel {
     $payloadHash = trim((string) ($item['payload_hash'] ?? ''));
     $existingId = null;
     if ($eventId !== '') {
-      $this->db->query('SELECT p.id FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id JOIN projects pr ON pr.id=e.project_id
-        WHERE p.event_id=:event_id AND pr.account_id=:account_id AND e.project_id=:project_id LIMIT 1');
+      $this->db->query('SELECT p.id,e.project_id FROM payloads p JOIN endpoints e ON e.id=p.endpoint_id JOIN projects pr ON pr.id=e.project_id
+        WHERE p.event_id=:event_id AND pr.account_id=:account_id LIMIT 1');
       $this->db->bind('event_id', substr($eventId, 0, 64));
       $this->db->bind('account_id', $accountId);
-      $this->db->bind('project_id', $projectId);
       $existing = $this->db->single();
+      if ($existing && (int)$existing['project_id'] !== $projectId) return ['event_id'=>$eventId,'status'=>'rejected','reason'=>'event_id sudah dipakai pada proyek lain.'];
       $existingId = $existing ? (int) $existing['id'] : null;
     }
-    if ($existingId === null && $payloadHash !== '') {
-      $this->db->query('SELECT id FROM payloads WHERE endpoint_id=:endpoint_id AND payload_hash=:payload_hash LIMIT 1');
-      $this->db->bind('endpoint_id', $endpointId);
-      $this->db->bind('payload_hash', $payloadHash);
-      $existing = $this->db->single();
-      $existingId = $existing ? (int) $existing['id'] : null;
-    }
+    if ($existingId !== null) return ['event_id' => $eventId, 'payload_id' => $existingId, 'status' => 'duplicate'];
 
     $now = date('Y-m-d H:i:s');
     $data = [
       'endpoint_id' => $endpointId,
+      'account_id' => $accountId,
+      'request_header' => $requestHeaderJson,
+      'occurred_at' => $item['occurred_at'] ?? null,
+      'meta_json' => $item['meta_json'] ?? null,
+      'capture_version' => $item['capture_version'] ?? 2,
       'event_id' => $eventId !== '' ? substr($eventId, 0, 64) : null,
       'session_id' => $sessionId !== '' ? substr($sessionId, 0, 64) : null,
       'sequence_no' => isset($item['sequence_no']) ? (int) $item['sequence_no'] : null,
@@ -115,22 +116,6 @@ class CaptureModel extends BaseModel {
       'screenshot' => $item['screenshot'] ?? null,
       'initiator' => $item['initiator'] ?? null
     ];
-
-    if ($existingId !== null) {
-      $this->db->query('UPDATE payloads SET endpoint_id=:endpoint_id,event_id=COALESCE(:event_id,event_id),session_id=:session_id,
-        sequence_no=:sequence_no,tab_id=:tab_id,frame_id=:frame_id,navigation_id=:navigation_id,source_type=:source_type,
-        request_url=:request_url,host=:host,content_type=:content_type,request_size=:request_size,response_size=:response_size,
-        truncated=:truncated,duration_ms=:duration_ms,request_body=:request_body,query_params=:query_params,response_body=:response_body,
-        status_code=:status_code,http_method=:http_method,referer=:referer,response_header=:response_header,payload_hash=:payload_hash,
-        screenshot=COALESCE(:screenshot,screenshot),initiator=:initiator,hit_count=hit_count+1,last_seen=:last_seen,updated_at=:updated_at
-        WHERE id=:id');
-      $data['id'] = $existingId;
-      $data['last_seen'] = $now;
-      $data['updated_at'] = $now;
-      $this->bindPayload($data);
-      $this->db->exe();
-      return ['event_id' => $eventId, 'payload_id' => $existingId, 'status' => 'duplicate'];
-    }
 
     $data['first_seen'] = $now;
     $data['last_seen'] = $now;

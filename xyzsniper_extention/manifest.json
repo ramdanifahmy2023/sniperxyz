@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "XYZ Sniper",
-  "version": "1.0",
-  "description": "A simple Chrome extension.",
+  "version": "2.0.0",
+  "minimum_chrome_version": "120",
+  "description": "Rekam request, aktivitas, dan angka halaman untuk audit melalui Sniper dan MCP.",
   "icons": {
     "16": "assets/images/icon_16.png",
     "32": "assets/images/icon_32.png",
@@ -32,14 +33,18 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["assets/js/content.js"],
-      "run_at": "document_start"
-    }
-  ],
-  "web_accessible_resources": [
+      "js": ["assets/js/privacy.js", "assets/js/page-snapshot.js", "assets/js/content.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    },
     {
-      "resources": ["assets/js/interceptor.js"],
-      "matches": ["<all_urls>"]
+      "matches": ["<all_urls>"],
+      "js": ["assets/js/main-world.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "background": {

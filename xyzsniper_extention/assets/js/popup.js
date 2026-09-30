@@ -3,12 +3,13 @@ const API_URL = CONFIG.getApiUrl('auth');
 
 document.addEventListener('DOMContentLoaded', () => {
   // Cek apakah ekstensi memiliki token
-  chrome.storage.local.get(['apiToken'], function(result) {
+  chrome.storage.local.get(['apiToken','activeProject'], function(result) {
     if (result.apiToken) {
       // Ada token, mari kita validasi ke API
       document.getElementById('status').innerText = 'Validating token...';
       
       fetch(API_URL, {
+        signal: AbortSignal.timeout(8000),
         method: 'POST', // atau GET sesuai kebutuhan, tapi di Api.php kita menangani POST/JSON
         headers: {
           'Authorization': 'Bearer ' + result.apiToken,
@@ -115,8 +116,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       })
       .catch(error => {
-        console.error('Error:', error);
-        document.getElementById('status').innerText = 'Connection error. Please try again.';
+        document.getElementById('status').innerText = 'Server belum terhubung. Antrean tetap ada di perangkat ini.';
+        if (result.activeProject) {
+          document.getElementById('main-section').style.display = 'block';
+          document.getElementById('user-name').innerText = 'Mode offline';
+          document.getElementById('project-title').innerText = result.activeProject.title;
+          document.getElementById('project-domain').innerText = result.activeProject.domain;
+          document.getElementById('project-info').style.display = 'block';
+          document.getElementById('no-project').style.display = 'none';
+          setupCaptureControls(result.apiToken);
+        }
       });
       
     } else {
@@ -136,38 +145,46 @@ function setupCaptureControls(token) {
   const end = document.getElementById('end-capture-btn');
   if (!status || !toggle || !end) return;
   const queueStatus = document.getElementById('capture-queue-status');
-  chrome.runtime.sendMessage({ type: 'XYZ_SNIPER_QUEUE_STATUS' }).then(queue => {
-    if (queueStatus && queue) queueStatus.textContent = `Queue: ${queue.pending || 0} pending · ${queue.inflight || 0} dikirim · ${queue.deadLetter || 0} gagal permanen`;
-  }).catch(() => {});
-  chrome.storage.local.get(['captureEnabled'], stored => {
-    let enabled = stored.captureEnabled !== false;
-    const render = () => {
-      status.textContent = enabled ? 'Audit aktif' : 'Audit dijeda';
-      status.dataset.variant = enabled ? 'primary' : 'outline';
-      toggle.textContent = enabled ? 'Pause' : 'Lanjutkan';
-    };
-    render();
-    toggle.onclick = () => {
-      enabled = !enabled;
-      chrome.storage.local.set({ captureEnabled: enabled }, render);
-      chrome.runtime.sendMessage({ type: 'XYZ_SNIPER_SET_CAPTURE_STATE', enabled }).catch(() => {});
-    };
-    end.onclick = async () => {
-      const state = await new Promise(resolve => chrome.storage.local.get(['captureSession'], resolve));
-      const sessionId = state.captureSession && state.captureSession.session_id;
-      if (sessionId) {
-        try {
-          await fetch(CONFIG.getApiUrl('sessionEnd'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ session_id: sessionId })
-          });
-        } catch (_) {}
-      }
-      await new Promise(resolve => chrome.storage.local.set({ captureEnabled: false }, resolve));
-      await new Promise(resolve => chrome.storage.local.remove('captureSession', resolve));
-      enabled = false;
-      render();
-    };
+  const feedback = document.getElementById('capture-feedback');
+  let enabled = false;
+  const request = async (type, extra = {}) => {
+    const result = await chrome.runtime.sendMessage({ type, ...extra });
+    if (result?.error || result?.ok === false) throw new Error(result.error || 'Perintah gagal.');
+    return result;
+  };
+  const refresh = async () => {
+    try {
+      const state = await request('XYZ_SNIPER_QUEUE_STATUS');
+      enabled = state.captureEnabled !== false;
+      status.textContent = enabled ? 'Perekam diizinkan' : 'Perekam dijeda';
+      toggle.textContent = enabled ? 'Jeda' : 'Lanjutkan';
+      queueStatus.textContent = `${state.pending} menunggu · ${state.failed} gagal · ${(state.bytes / 1048576).toFixed(1)} MiB. ${state.closing ? `${state.closing} sesi menunggu ditutup. ` : ''}Terakhir tersimpan: ${state.lastAck ? new Date(state.lastAck).toLocaleTimeString() : 'belum ada ACK'}.`;
+      const reasons = state.errors.map(item => item.reason);
+      if (state.captureError || reasons.length) feedback.textContent = state.captureError || reasons.join(' · ');
+    } catch (error) { feedback.textContent = error.message; }
+  };
+  const action = (id, work) => document.getElementById(id).onclick = async () => {
+    const button = document.getElementById(id); button.disabled = true; feedback.textContent = 'Memproses...';
+    try { feedback.textContent = await work() || 'Selesai.'; }
+    catch (error) { feedback.textContent = error.message; }
+    finally { button.disabled = false; await refresh(); }
+  };
+  action('toggle-capture-btn', async () => { await request('XYZ_SNIPER_SET_CAPTURE_STATE', { enabled: !enabled }); return enabled ? 'Perekam dijeda.' : 'Perekam diizinkan pada domain proyek. Refresh halaman jika baru memperbarui ekstensi.'; });
+  action('end-capture-btn', async () => { await request('XYZ_SNIPER_END_SESSION'); return 'Perekam berhenti. Sesi ditutup setelah antreannya tersimpan. Data gagal tetap perlu ditangani.'; });
+  action('retry-capture-btn', async () => { await request('XYZ_SNIPER_RETRY'); return 'Antrean dicoba kembali. Periksa jumlah gagal.'; });
+  action('snapshot-now-btn', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const result = await chrome.tabs.sendMessage(tab.id, { type: 'XYZ_SNIPER_SNAPSHOT_NOW' }, { frameId: 0 });
+    if (!result?.ok) throw new Error('Belum direkam. Pastikan domain proyek cocok dan perekam tidak dijeda.');
+    return 'Snapshot diminta. Tunggu status terakhir tersimpan sebelum membaca lewat AI.';
   });
+  action('export-queue-btn', async () => {
+    const data = await request('XYZ_SNIPER_EXPORT_QUEUE');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = `sniper-queue-${Date.now()}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return 'Antrean diekspor. Data tetap disimpan di ekstensi.';
+  });
+  void refresh();
+  setInterval(refresh, 2000);
 }

@@ -569,3 +569,7 @@
     height: 14rem;
   }
 }
+/* Capture controls remain reachable in the narrow extension popup. */
+.capture-controls .btn { min-height: 44px; white-space: normal; }
+.capture-controls .queue-status { display: block; flex-basis: 100%; overflow-wrap: anywhere; }
+.capture-controls :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

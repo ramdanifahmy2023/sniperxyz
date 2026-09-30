@@ -47,6 +47,11 @@ SSE.
             "get_session_events",
             "get_workflow_map",
             "get_capture_stats",
+            "get_event",
+            "read_body",
+            "get_page_snapshots",
+            "get_dashboard_metrics",
+            "get_capture_health",
           ],
         },
       },
@@ -70,7 +75,7 @@ bearer_token_env_var = "SNIPER_MCP_TOKEN"
 required = false
 startup_timeout_sec = 30
 tool_timeout_sec = 60
-enabled_tools = ["get_projects", "get_endpoints", "get_payloads", "search_traffic", "get_sessions", "get_session_events", "get_workflow_map", "get_capture_stats"]
+enabled_tools = ["get_projects", "get_endpoints", "get_payloads", "search_traffic", "get_sessions", "get_session_events", "get_workflow_map", "get_capture_stats", "get_event", "read_body", "get_page_snapshots", "get_dashboard_metrics", "get_capture_health"]
 ```
 
 The equivalent command is:
@@ -107,6 +112,11 @@ mcp_servers:
         - get_session_events
         - get_workflow_map
         - get_capture_stats
+        - get_event
+        - read_body
+        - get_page_snapshots
+        - get_dashboard_metrics
+        - get_capture_health
       resources: false
       prompts: false
 ```
@@ -266,3 +276,9 @@ rotate it if it is copied outside the intended client.
 - [Claude MCP connector](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
 - [OpenCode MCP servers](https://opencode.ai/v2/docs/mcp-servers)
 - [MCP lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle) and [transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+## Capture v2 results
+
+Lists now return `structuredContent.items` and `pagination` with `has_more` and `next_offset`. Read all required pages before summarizing. Body previews are bounded; use `get_event` and `read_body` with the returned byte cursor for details. Capture truncation cannot be undone by pagination.
+
+Dashboard snapshots are available through `get_page_snapshots` and `get_dashboard_metrics`. Metric labels are candidates: verify raw text, context, selected period, and capture time before presenting a number. `get_capture_health` reports server-side coverage only; pending extension queue items are not visible to MCP. See the [Indonesian tutorial](tutorial-sniper.md).

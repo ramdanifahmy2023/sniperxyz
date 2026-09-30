@@ -13,10 +13,10 @@
           <tr>
             <td><?= htmlspecialchars((string) ($event['sequence_no'] ?? '-')); ?></td>
             <td><span class="badge" data-variant="primary"><?= htmlspecialchars($event['http_method']); ?></span></td>
-            <td><code title="<?= htmlspecialchars($event['request_url'] ?? ''); ?>"><?= htmlspecialchars($event['path']); ?></code></td>
+            <td><a href="<?= burl; ?>/panel/event/<?= rawurlencode($event['event_id'] ?? ''); ?>"><code title="<?= htmlspecialchars($event['request_url'] ?? ''); ?>"><?= htmlspecialchars($event['path']); ?></code></a><?php if ((int)$event['capture_version'] === 1): ?><small> · Agregat lama</small><?php endif; ?><?php if ($event['truncated']): ?><small> · Isi dibatasi</small><?php endif; ?></td>
             <td><?= htmlspecialchars((string) ($event['status_code'] ?? '-')); ?></td>
             <td><?= htmlspecialchars($event['source_type'] ?? '-'); ?></td>
-            <td><?= htmlspecialchars($event['last_seen'] ?? $event['created_at']); ?></td>
+            <td><?= htmlspecialchars($event['occurred_at'] ?? $event['created_at']); ?><?= $event['occurred_at'] ? ' UTC' : ''; ?></td>
             <td><?= number_format((int) ($event['hit_count'] ?? 1)); ?></td>
           </tr>
         <?php endforeach; endif; ?>
@@ -24,4 +24,9 @@
       </table>
     </div>
   </article>
+  <nav aria-label="Halaman timeline" class="panel-page-actions" style="margin-top:16px;">
+    <?php if ($data['page']>1): ?><a class="btn" href="?page=<?= $data['page']-1; ?>">Sebelumnya</a><?php endif; ?>
+    <span>Halaman <?= $data['page']; ?> · <?= $data['has_more'] ? 'Masih ada rekaman berikutnya' : 'Akhir daftar'; ?></span>
+    <?php if ($data['has_more']): ?><a class="btn" href="?page=<?= $data['page']+1; ?>">Berikutnya</a><?php endif; ?>
+  </nav>
 </main>

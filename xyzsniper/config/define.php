@@ -1,7 +1,7 @@
 <?php
 
 // Environment File Loader
-$env = parse_ini_file(__DIR__ . '/.env');
+$env = parse_ini_file(getenv('SNIPER_ENV_FILE') ?: __DIR__ . '/.env');
 $mode = strtolower(trim($env['APP_MODE'] ?? 'local'));
 
 if (!in_array($mode, ['local', 'host'], true)) {

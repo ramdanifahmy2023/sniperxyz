@@ -26,4 +26,9 @@
       </table>
     </div>
   </article>
+  <nav aria-label="Halaman sesi" class="panel-page-actions" style="margin-top:16px;">
+    <?php if ($data['page']>1): ?><a class="btn" href="?page=<?= $data['page']-1; ?>">Sebelumnya</a><?php endif; ?>
+    <span>Halaman <?= $data['page']; ?></span>
+    <?php if ($data['has_more']): ?><a class="btn" href="?page=<?= $data['page']+1; ?>">Berikutnya</a><?php endif; ?>
+  </nav>
 </main>

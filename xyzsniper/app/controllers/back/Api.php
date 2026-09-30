@@ -185,405 +185,43 @@ class Api extends Controller {
     exit;
   }
   public function capture() {
-    header('Content-Type: application/json');
-
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        exit;
-    }
-
-    // 1. Validasi Token Auth
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-    $token = null;
-    
-    if (function_exists('apache_request_headers')) {
-        $headers = apache_request_headers();
-        if (isset($headers['Authorization'])) {
-            $authHeader = $headers['Authorization'];
-        }
-    }
-    
-    if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-        $token = $matches[1];
-    }
-    
-    if (!$token) {
-        echo json_encode(['status' => 'error', 'message' => 'Token tidak ditemukan.']);
-        exit;
-    }
-
-    $tokenModel = $this->m('ExtensionTokenModel');
-    $tokenData = $tokenModel->getByToken($token);
-    
-    if (!$tokenData) {
-        echo json_encode(['status' => 'error', 'message' => 'Token tidak valid.']);
-        exit;
-    }
-
-    $accountId = $tokenData['account_id'];
-
-    // 2. Dapatkan Project Aktif
-    $projectModel = $this->m('ProjectModel');
-    // Ambil project aktif dari token/akun ini
-    // Memanfaatkan method existing atau ambil list lalu filter
-    $projects = $projectModel->getAllByAccountId($accountId);
-    $activeProject = null;
-    foreach ($projects as $p) {
-        if ((int) $p['is_active'] === 1) {
-            $activeProject = $p;
-            break;
-        }
-    }
-
-    if (!$activeProject) {
-        echo json_encode(['status' => 'error', 'message' => 'Tidak ada proyek aktif.']);
-        exit;
-    }
-    $projectId = $activeProject['id'];
-
-    // 3. Parsing Input dari Ekstensi
-    $input = $this->readJsonInput();
-    
-    if (!$input || empty($input['url'])) {
-        echo json_encode(['status' => 'error', 'message' => 'Data payload tidak lengkap.']);
-        exit;
-    }
-
-    // Parsing Path dari URL
-    $parsedUrl = parse_url($input['url']);
-    $path = $parsedUrl['path'] ?? '/';
-
-    $requestHeaders = $input['requestHeaders'] ?? [];
-    $responseHeaders = $input['responseHeaders'] ?? [];
-
-    $endpointModel = $this->m('EndpointModel');
-    $endpoint = $endpointModel->getByPathAndProjectId($path, $projectId);
-
-    // Identifikasi Methods yang diizinkan (dari responseHeaders -> access-control-allow-methods)
-    $allowMethodsStr = '';
-    foreach ($responseHeaders as $key => $val) {
-        if (strtolower($key) === 'access-control-allow-methods') {
-            $allowMethodsStr = $val;
-            break;
-        }
-    }
-
-    // Default method flags
-    $methods = [
-        'get' => 0, 'post' => 0, 'put' => 0, 'patch' => 0, 
-        'delete' => 0, 'head' => 0, 'option' => 0
-    ];
-
-    if (!empty($allowMethodsStr)) {
-        $allowed = array_map('trim', explode(',', strtolower($allowMethodsStr)));
-        foreach ($allowed as $m) {
-            if ($m === 'options') $m = 'option';
-            if (isset($methods[$m])) {
-                $methods[$m] = 1;
-            }
-        }
-    } else {
-        // Fallback: gunakan method request saat ini
-        $currentMethod = strtolower($input['method'] ?? '');
-        if ($currentMethod === 'options') $currentMethod = 'option';
-        if (isset($methods[$currentMethod])) {
-            $methods[$currentMethod] = 1;
-        }
-    }
-
-    // Data yang akan disimpan ke tabel endpoints
-    $dataToSave = array_merge([
-        'project_id' => $projectId,
-        'path' => $path,
-        'request_header' => json_encode($requestHeaders)
-    ], $methods);
-
-    if ($endpoint) {
-        // Jika sudah ada, update metodenya dan header terbarunya
-        $endpointModel->updateEndpoint($endpoint['id'], $dataToSave);
-        $endpointId = $endpoint['id'];
-    } else {
-        // Buat endpoint baru
-        $endpointId = $endpointModel->createEndpoint($dataToSave);
-    }
-
-    // --- PAYLOAD SAVING LOGIC ---
-    $payloadModel = $this->m('PayloadModel');
-    $payloadHash = $input['payloadHash'] ?? '';
-    $eventId = trim((string) ($input['eventId'] ?? $input['event_id'] ?? '')) ?: bin2hex(random_bytes(16));
-
-
-    // Handle Screenshot (Base64 to File)
-    $screenshotUrl = null;
-    $base64Image = $input['screenshot'] ?? '';
-    
-    if (!empty($base64Image) && preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
-        $data = substr($base64Image, strpos($base64Image, ',') + 1);
-        $data = base64_decode($data, true);
-        if ($data === false || strlen($data) > self::MAX_BODY_BYTES) {
-          http_response_code(413); echo json_encode(['status' => 'error', 'message' => 'Screenshot terlalu besar.']); exit;
-        }
-        $extension = strtolower($type[1]);
-        
-        $filename = 'shot_' . time() . '_' . substr($payloadHash, 0, 8) . '.' . $extension;
-        
-        // Path absolut menuju public/assets/images/screenshots/{projectId}/
-        $dir = __DIR__ . '/../../../public/assets/images/screenshots/' . $projectId . '/';
-        if (!is_dir($dir)) {
-            mkdir($dir, 0777, true);
-        }
-        
-        $filepath = $dir . $filename;
-        if (file_put_contents($filepath, $data)) {
-            $screenshotUrl = 'assets/images/screenshots/' . $projectId . '/' . $filename;
-        }
-    }
-
-    // Persiapkan Data Payload
-        $queryParams = $input['queryParams'] ?? '';
-        $reqBodyRaw = $input['requestBody'] ?? null;
-        $this->enforceBodyLimit($reqBodyRaw);
-    $requestBodyStr = is_array($reqBodyRaw) ? json_encode($reqBodyRaw) : $reqBodyRaw;
-    
-        $resBodyRaw = $input['responseBody'] ?? null;
-        $this->enforceBodyLimit($resBodyRaw);
-    $responseBodyStr = is_array($resBodyRaw) ? json_encode($resBodyRaw) : $resBodyRaw;
-    $responseHeadersStr = is_array($responseHeaders) ? json_encode($responseHeaders) : null;
-    $referer = $input['pageUrl'] ?? null;
-
-    $payloadData = [
-      'endpoint_id' => $endpointId,
-        'event_id' => $eventId,
-        'session_id' => $input['sessionId'] ?? $input['session_id'] ?? null,
-        'sequence_no' => $input['sequenceNo'] ?? $input['sequence_no'] ?? null,
-        'tab_id' => $input['tabId'] ?? $input['tab_id'] ?? null,
-        'frame_id' => $input['frameId'] ?? $input['frame_id'] ?? null,
-        'navigation_id' => $input['navigationId'] ?? $input['navigation_id'] ?? null,
-        'source_type' => $input['sourceType'] ?? $input['source_type'] ?? null,
-        'request_url' => $input['url'],
-        'host' => $this->normalizeProjectHost($input['url']),
-        'content_type' => $input['contentType'] ?? null,
-        'request_size' => $requestBodyStr === null ? 0 : strlen((string) $requestBodyStr),
-        'response_size' => $responseBodyStr === null ? 0 : strlen((string) $responseBodyStr),
-        'truncated' => !empty($input['truncated']) ? 1 : 0,
-        'duration_ms' => $input['durationMs'] ?? $input['duration_ms'] ?? null,
-        'hit_count' => 1,
-        'first_seen' => date('Y-m-d H:i:s'),
-        'last_seen' => date('Y-m-d H:i:s'),
-        'initiator' => $input['initiator'] ?? null,
-      'request_body' => $requestBodyStr,
-        'query_params' => $queryParams,
-        'response_body' => $responseBodyStr,
-        'status_code' => $input['status'] ?? null,
-        'http_method' => $input['method'] ?? 'GET',
-        'referer' => $referer,
-        'response_header' => $responseHeadersStr,
-        'payload_hash' => $payloadHash,
-        'screenshot' => $screenshotUrl
-    ];
-
-    $payloadModel->createPayload($payloadData);
-
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'Berhasil memetakan endpoint dan menyimpan payload.',
-        'data' => [
-            'endpoint_id' => $endpointId,
-            'path' => $path
-        ]
-    ]);
-    exit;
+    $this->captureBulk(true);
   }
 
-  public function captureBulk() {
-    header('Content-Type: application/json');
-
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        exit;
+  public function captureBulk($single = false) {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
+    $auth = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if (!preg_match('/^Bearer\s+(\S+)$/i', $auth, $match)) {
+      http_response_code(401); echo json_encode(['status'=>'error','message'=>'Token diperlukan.']); exit;
     }
-
-    // 1. Validasi Token Auth
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-    $token = null;
-    
-    if (function_exists('apache_request_headers')) {
-        $headers = apache_request_headers();
-        if (isset($headers['Authorization'])) {
-            $authHeader = $headers['Authorization'];
-        }
-    }
-    
-    if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
-        $token = $matches[1];
-    }
-    
-    if (!$token) {
-        echo json_encode(['status' => 'error', 'message' => 'Token tidak ditemukan.']);
-        exit;
-    }
-
-    $tokenModel = $this->m('ExtensionTokenModel');
-    $tokenData = $tokenModel->getByToken($token);
-    
-    if (!$tokenData) {
-        echo json_encode(['status' => 'error', 'message' => 'Token tidak valid.']);
-        exit;
-    }
-
-    $accountId = $tokenData['account_id'];
-
-    // 2. Dapatkan Semua Proyek untuk Akun Ini
-    $projectModel = $this->m('ProjectModel');
-    $projects = $projectModel->getAllByAccountId($accountId);
-    
-    if (empty($projects)) {
-        echo json_encode(['status' => 'error', 'message' => 'Tidak ada proyek pada akun ini.']);
-        exit;
-    }
-
-    // 3. Parsing Input (Array of Payloads)
+    $token = $this->m('ExtensionTokenModel')->getByToken($match[1]);
+    if (!$token) { http_response_code(401); echo json_encode(['status'=>'error','message'=>'Token tidak valid.']); exit; }
+    require_once __DIR__ . '/../../../core/CaptureInput.php';
     $input = $this->readJsonInput();
-    if (!$input || empty($input['payloads']) || !is_array($input['payloads'])) {
-        echo json_encode(['status' => 'error', 'message' => 'Data payload kosong atau format salah.']);
-        exit;
+    $payloads = $single === true ? [$input] : ($input['payloads'] ?? []);
+    if (!is_array($payloads) || !$payloads || count($payloads) > 100) {
+      http_response_code(422); echo json_encode(['status'=>'error','message'=>'Kirim 1 sampai 100 event.']); exit;
     }
-
-    $payloads = $input['payloads'];
-    
-    // Preflight every payload independently before any write. This prevents a mixed
-    // batch from being assigned to the first payload's project.
-    $payloadProjects = [];
-    $validPayloads = [];
-    $rejectedResults = [];
-    foreach ($payloads as $idx => $candidate) {
-      $refererHost = $this->normalizeProjectHost($candidate['pageUrl'] ?? '');
-      $requestHost = $this->normalizeProjectHost($candidate['url'] ?? '');
-      $matchedProject = null; $matchedScore = -1; $tie = false;
-      foreach ($projects as $p) {
-        $projectHost = $this->normalizeProjectHost($p['domain'] ?? '');
-        $score = max($this->projectHostScore($refererHost, $projectHost) >= 0 ? 1000000 + $this->projectHostScore($refererHost, $projectHost) : -1, $this->projectHostScore($requestHost, $projectHost));
-        if ($score > $matchedScore) { $matchedScore = $score; $matchedProject = $p; $tie = false; }
-        elseif ($score >= 0 && $score === $matchedScore) { $tie = true; }
+    $projects = $this->m('ProjectModel')->getAllByAccountId($token['account_id']);
+    $items = []; $results = [];
+    foreach ($payloads as $candidate) {
+      try {
+        if (!is_array($candidate)) throw new InvalidArgumentException('Event harus berupa object.');
+        $items[] = CaptureInput::normalize($candidate, $projects);
+      } catch (Throwable $error) {
+        $results[] = ['event_id'=>is_array($candidate) ? ($candidate['event_id'] ?? $candidate['eventId'] ?? null) : null,
+          'status'=>'rejected','reason'=>$error->getMessage()];
       }
-      if (!$matchedProject || $matchedScore < 0 || $tie) {
-        $rejectedResults[] = [
-          'event_id' => $candidate['eventId'] ?? $candidate['event_id'] ?? null,
-          'status' => 'rejected',
-          'reason' => 'domain tidak cocok atau ambigu'
-        ];
-        continue;
-      }
-      $payloadProjects[$idx] = $matchedProject;
-      $validPayloads[$idx] = $candidate;
     }
-    if (count($payloads) > 100) {
-      http_response_code(413);
-      echo json_encode(['status' => 'error', 'message' => 'Maksimal 100 payload per batch.']);
-      exit;
-    }
-
-    $items = [];
-    foreach ($validPayloads as $idx => $pData) {
-        $projectId = (int) $payloadProjects[$idx]['id'];
-        $requestUrl = (string) ($pData['url'] ?? '');
-        $pageUrl = (string) ($pData['pageUrl'] ?? '');
-        $parsed = parse_url($requestUrl);
-        if (!$parsed || empty($parsed['path'])) {
-          $parsed = parse_url($pageUrl . $requestUrl);
-        }
-        $path = $parsed['path'] ?? '/';
-        if ($path === '') $path = '/';
-        $requestHeaders = is_array($pData['requestHeaders'] ?? null) ? $pData['requestHeaders'] : [];
-        $responseHeaders = is_array($pData['responseHeaders'] ?? null) ? $pData['responseHeaders'] : [];
-
-        $allowMethodsStr = '';
-        $contentType = '';
-        foreach ($responseHeaders as $key => $val) {
-            $lowerKey = strtolower((string) $key);
-            if ($lowerKey === 'access-control-allow-methods') $allowMethodsStr = (string) $val;
-            if ($lowerKey === 'content-type') $contentType = (string) $val;
-        }
-
-        $methods = ['get'=>0, 'post'=>0, 'put'=>0, 'patch'=>0, 'delete'=>0, 'head'=>0, 'option'=>0];
-        if ($allowMethodsStr !== '') {
-            foreach (array_map('trim', explode(',', strtolower($allowMethodsStr))) as $method) {
-                if ($method === 'options') $method = 'option';
-                if (isset($methods[$method])) $methods[$method] = 1;
-            }
-        } else {
-            $method = strtolower((string) ($pData['method'] ?? 'get'));
-            if ($method === 'options') $method = 'option';
-            if (isset($methods[$method])) $methods[$method] = 1;
-        }
-
-        $requestBody = $pData['requestBody'] ?? null;
-        $responseBody = $pData['responseBody'] ?? null;
-        $this->enforceBodyLimit($requestBody);
-        $this->enforceBodyLimit($responseBody);
-        $requestBodyString = is_array($requestBody) ? json_encode($requestBody, JSON_UNESCAPED_SLASHES) : $requestBody;
-        $responseBodyString = is_array($responseBody) ? json_encode($responseBody, JSON_UNESCAPED_SLASHES) : $responseBody;
-        $host = $this->normalizeProjectHost($requestUrl !== '' ? $requestUrl : $pageUrl);
-        $eventId = trim((string) ($pData['eventId'] ?? $pData['event_id'] ?? ''));
-        if ($eventId === '') $eventId = bin2hex(random_bytes(16));
-        $payloadHash = trim((string) ($pData['payloadHash'] ?? ''));
-
-        $items[] = [
-          'project_id' => $projectId,
-          'path' => $path,
-          'methods' => $methods,
-          'request_headers' => $requestHeaders,
-          'event_id' => $eventId,
-          'session_id' => $pData['sessionId'] ?? $pData['session_id'] ?? null,
-          'session_title' => $pData['sessionTitle'] ?? $pData['session_title'] ?? null,
-          'session_started_at' => $pData['sessionStartedAt'] ?? $pData['session_started_at'] ?? null,
-          'sequence_no' => $pData['sequenceNo'] ?? $pData['sequence_no'] ?? null,
-          'tab_id' => $pData['tabId'] ?? $pData['tab_id'] ?? null,
-          'frame_id' => $pData['frameId'] ?? $pData['frame_id'] ?? null,
-          'navigation_id' => $pData['navigationId'] ?? $pData['navigation_id'] ?? null,
-          'source_type' => $pData['sourceType'] ?? $pData['source_type'] ?? null,
-          'request_url' => $requestUrl,
-          'host' => $host,
-          'content_type' => $contentType,
-          'request_size' => $requestBodyString === null ? 0 : strlen((string) $requestBodyString),
-          'response_size' => $responseBodyString === null ? 0 : strlen((string) $responseBodyString),
-          'truncated' => !empty($pData['truncated']),
-          'duration_ms' => $pData['durationMs'] ?? $pData['duration_ms'] ?? null,
-          'request_body' => $requestBodyString,
-          'query_params' => $pData['queryParams'] ?? '',
-          'response_body' => $responseBodyString,
-          'status_code' => $pData['status'] ?? null,
-          'http_method' => $pData['method'] ?? 'GET',
-          'referer' => $pageUrl,
-          'response_headers' => $responseHeaders,
-          'payload_hash' => $payloadHash,
-          'screenshot' => null,
-          'initiator' => $pData['initiator'] ?? null
-        ];
-    }
-
-    $captureModel = $this->m('CaptureModel');
     try {
-      $results = $captureModel->saveBatch($accountId, $items);
-    } catch (Throwable $exception) {
-      error_log('Capture batch failed: ' . $exception->getMessage());
-      http_response_code(503);
-      echo json_encode(['status' => 'error', 'message' => 'Batch capture gagal disimpan; silakan retry.']);
-      exit;
+      $results = array_merge($results, $this->m('CaptureModel')->saveBatch((int) $token['account_id'], $items));
+    } catch (Throwable $error) {
+      error_log('Capture batch: ' . $error->getMessage());
+      http_response_code(503); echo json_encode(['status'=>'error','message'=>'Penyimpanan gagal. Pastikan migrasi capture v2 sudah dijalankan.']); exit;
     }
-    $results = array_merge($rejectedResults, $results);
-    $processedCount = count($results);
-    $storedCount = count(array_filter($results, static fn($result) => ($result['status'] ?? '') === 'stored'));
-    $duplicateCount = count(array_filter($results, static fn($result) => ($result['status'] ?? '') === 'duplicate'));
-
-    echo json_encode([
-        'status' => 'success',
-        'message' => "Berhasil memproses $processedCount payload(s) dari antrean.",
-        'data' => [
-          'processed' => $processedCount,
-          'stored' => $storedCount,
-          'duplicates' => $duplicateCount,
-          'results' => $results
-        ]
-    ]);
+    echo json_encode(['status'=>'success','data'=>['results'=>$results]], JSON_UNESCAPED_UNICODE);
     exit;
   }
 

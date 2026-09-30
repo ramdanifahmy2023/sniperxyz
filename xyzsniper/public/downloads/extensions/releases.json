@@ -1,0 +1,29 @@
+{
+    "releases": [
+        {
+            "version": "2.0.0",
+            "published_at": "2026-09-30",
+            "file": "downloads/extensions/2.0.0/xyz-sniper-chrome-extension-2.0.0.zip",
+            "sha256": "d6abce36371ec182a70ef6133d521b6da0b64834ea0a559a1b3b9cb80104ed5c",
+            "changelog": [
+                "Menyimpan setiap kejadian secara terpisah; retry event yang sama tidak menggandakan histori.",
+                "Menambah snapshot teks, kandidat angka, konteks, dan filter halaman untuk pembacaan dashboard melalui MCP.",
+                "Memindahkan antrean ke IndexedDB dengan ACK per event, retry, status gagal, dan ekspor antrean.",
+                "Menambah kontrol jeda, lanjutkan, akhir sesi, dan ambil angka halaman; kontrol tetap tersedia ketika server offline.",
+                "Memperbaiki pembacaan fetch/XHR, JSON vendor, FormData berulang, serta memberi tanda saat body dibatasi.",
+                "Menambah detail bukti, pembacaan body bertahap, pagination MCP, dan ekspor sesi tanpa batas 10.000 event.",
+                "Memerlukan migrasi database v2, reload ekstensi, dan refresh halaman setelah upgrade. OCR/CDP serta adapter khusus Shopee belum termasuk."
+            ]
+        },
+        {
+            "version": "1.0.0",
+            "published_at": "2026-09-29",
+            "file": "downloads/extensions/1.0.0/xyz-sniper-chrome-extension-1.0.0.zip",
+            "sha256": "75ddcaf6b6bf0be3b401da312ccb6b6694a762bac51c507f0755b1cbc2c259e6",
+            "changelog": [
+                "Rilis awal ekstensi Chrome XYZ Sniper untuk Windows dan macOS.",
+                "Menyediakan pemasangan melalui menu ekstensi Chrome dalam mode developer."
+            ]
+        }
+    ]
+}

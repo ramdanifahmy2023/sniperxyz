@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <head>
   <meta charset="UTF-8">
@@ -69,10 +69,14 @@
             -</p>
 
           <div id="capture-controls" class="capture-controls" style="margin-top: 0.75rem; padding-top: 0.75rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-            <span id="capture-status" class="badge" data-variant="primary">Audit aktif</span>
-            <button id="toggle-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Pause</button>
+            <span id="capture-status" class="badge" data-variant="primary">Memeriksa perekam...</span>
+            <button id="toggle-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Memuat...</button>
             <button id="end-capture-btn" type="button" class="btn" data-variant="outline" data-size="sm">Akhiri sesi</button>
-            <small id="capture-queue-status" class="queue-status">Queue: memuat...</small>
+            <button id="snapshot-now-btn" type="button" class="btn" data-variant="outline">Ambil angka halaman</button>
+            <button id="retry-capture-btn" type="button" class="btn" data-variant="outline">Coba kirim ulang</button>
+            <button id="export-queue-btn" type="button" class="btn" data-variant="outline">Ekspor antrean</button>
+            <small id="capture-queue-status" class="queue-status" role="status" aria-live="polite">Antrean: memuat...</small>
+            <p id="capture-feedback" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></p>
           </div>
 
           <div id="mcp-info" class="mcp-info" style="margin-top: 1rem; padding-top: 1rem; display: none;">

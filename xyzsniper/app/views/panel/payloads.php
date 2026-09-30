@@ -69,10 +69,9 @@
                 
                 $referer = $p['referer'] ?? '-';
                 
-                // Ekstrak User Agent dari request_header di tabel endpoint jika ada
                 $ua = '-';
-                if (!empty($data['endpoint']['request_header'])) {
-                    $headers = json_decode($data['endpoint']['request_header'], true);
+                if (!empty($p['request_header'])) {
+                    $headers = json_decode($p['request_header'], true);
                     if ($headers) {
                         // Cari kunci user-agent case insensitive
                         foreach ($headers as $k => $v) {
@@ -111,7 +110,9 @@
                 <td><span title="<?= htmlspecialchars($referer) ?>"><?= htmlspecialchars($ref_short) ?></span></td>
                 <td>
                   <?php if ($screenshot_url): ?>
-                    <img src="<?= $screenshot_url ?>" alt="Screenshot Preview" class="avatar" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--color-border);" onclick="document.getElementById('screenshotImageModal').src='<?= $screenshot_url ?>'; document.getElementById('screenshotModal').showModal();">
+                    <button type="button" class="btn" data-variant="ghost" aria-label="Buka screenshot rekaman" onclick="document.getElementById('screenshotImageModal').src=<?= htmlspecialchars(json_encode($screenshot_url), ENT_QUOTES, 'UTF-8') ?>; document.getElementById('screenshotModal').showModal();">
+                      <img src="<?= htmlspecialchars($screenshot_url, ENT_QUOTES, 'UTF-8') ?>" alt="" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px;">
+                    </button>
                   <?php else: ?>
                     <span style="color: var(--color-muted-foreground); font-size: 0.85rem; font-style: italic;">Tidak Ada</span>
                   <?php endif; ?>
@@ -289,7 +290,7 @@
     });
   </script>
 
-  <dialog id="screenshotModal" class="dialog" aria-labelledby="screenshotModalTitle" aria-describedby="screenshotModalDesc" onclick="if (event.target === this) this.close()">
+  <dialog id="screenshotModal" class="dialog" aria-label="Screenshot rekaman" onclick="if (event.target === this) this.close()">
     <div style="max-width: 800px; width: 100%; padding: 0; overflow: hidden; background: transparent; box-shadow: none;">
       <div style="position: relative;">
         <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" style="position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.5); color: white; border-radius: 50%;" aria-label="Tutup" onclick="this.closest('dialog').close()">
